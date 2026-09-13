@@ -1,0 +1,3 @@
+#include "wx/msw/wx.rc"
+ETO_SCRIPT TEXT "resources/eto.js"
+MAIN_SCRIPT TEXT "resources/main.js"
