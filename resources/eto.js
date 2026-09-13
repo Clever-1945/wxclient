@@ -61,7 +61,7 @@ class GridBagLayout {
  * @property {number} columnSpan - Количество занимаемях столбцов
  * @property {number} row - Строка внутри контейнера
  * @property {number} rowSpan - Количество занимаемях строк
- * @property {string} text - Текст в подсказке
+ * @property {string} label - Текст в подсказке
  * @property {string} tag - Метка контрола
  */
 class Label {
@@ -84,10 +84,11 @@ class Label {
  * @property {number} columnSpan - Количество занимаемях столбцов
  * @property {number} row - Строка внутри контейнера
  * @property {number} rowSpan - Количество занимаемях строк
- * @property {string} text - Текст в подсказке
+ * @property {string} value - Текст в подсказке
  * @property {string} placeholder - Текст как подсказка в пустом поле
  * @property {boolean} multiline - Поле многострочное
  * @property {string} tag - Метка контрола
+ * @property {function} changed - Событие вызывается при изменении значения
  */
 class Text {
     /**
@@ -102,13 +103,38 @@ class Text {
    * @param {string} value - текст для поля
    * @returns {undefined} Результат
    */
-    setText = function (value) { }
+    setValue = function (value) { }
 
     /**
    * Получить значение из текстового поля
    * @returns {string} Текст из поля
    */
-    getText = function () { }
+    getValue = function () { }
+}
+
+/**
+ * @typedef {Object} CheckBoxConfig
+ * @property {number} id - Идентификатор контрола
+ * @property {string} name - Имя контрола
+ * @property {any} width - Ширина
+ * @property {any} height - Высота
+ * @property {number} column - Столбец внутри контейнера
+ * @property {number} columnSpan - Количество занимаемях столбцов
+ * @property {number} row - Строка внутри контейнера
+ * @property {number} rowSpan - Количество занимаемях строк
+ * @property {string} tag - Метка контрола
+ * @property {number} selectedIndex - Номер выбранного элемента
+ * @property {Array} items - Элементы, с ключами text и value
+ * @property {function} changed - Событие вызывается при изменении значения
+ */
+class CheckBox {
+
+    /**
+     * @param {CheckBoxConfig} config - Объект настроек
+     */
+    constructor(config) {
+        Object.assign(this, config);
+    }
 }
 
 /**
@@ -122,8 +148,9 @@ class Text {
  * @property {number} row - Строка внутри контейнера
  * @property {number} rowSpan - Количество занимаемях строк
  * @property {string} tag - Метка контрола
- * @property {number} selectedIndex - Номер выбранного элемента
- * @property {Array} items - Элементы, с ключами text и value
+ * @property {boolean} value - Текущее значение
+ * @property {string} label - Подсказка
+ * @property {function} changed - Событие вызывается при изменении значения
  */
 class ComboBox {
     /**
@@ -132,8 +159,33 @@ class ComboBox {
     constructor(config) {
         Object.assign(this, config);
     }
-}
 
+    /**
+     * Получить подсказку
+     * @returns {undefined} Результат
+     */
+    getLabel = function () { }
+
+    /**
+     * Установить подсказку
+     * @param {string} label - подсказка
+     * @returns {undefined} Результат
+     */
+    setLabel = function (label) { }
+
+    /**
+     * Получить начение
+     * @returns {string} Результат
+     */
+    getValue = function () { }
+
+    /**
+     * Установить значение
+     * @param {string} value - Установить новое активное значение
+     * @returns {undefined} Результат
+     */
+    setValue = function (value) { }
+}
 
 /**
  * @typedef {Object} ButtonConfig
@@ -145,7 +197,7 @@ class ComboBox {
  * @property {number} columnSpan - Количество занимаемях столбцов
  * @property {number} row - Строка внутри контейнера
  * @property {number} rowSpan - Количество занимаемях строк
- * @property {string} text - Текст в подсказке
+ * @property {string} label - Текст в подсказке
  * @property {function} click - Функция при клике
  * @property {string} tag - Метка контрола
  */

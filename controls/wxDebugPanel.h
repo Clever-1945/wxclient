@@ -9,44 +9,36 @@
 #include "wxErrorsFrame.h"
 #include "wxLogsFrame.h"
 
-class wxDebugPanel : public wxPanel
-{
+class wxDebugPanel : public wxPanel {
 private:
-    wxButton* buttonError = nullptr;
-    wxButton* buttonInfo = nullptr;
-    wxButton* buttonWarning = nullptr;
-    wxButton* buttonRefresh = nullptr;
+    wxButton *buttonError = nullptr;
+    wxButton *buttonInfo = nullptr;
+    wxButton *buttonWarning = nullptr;
+    wxButton *buttonRefresh = nullptr;
     int64_t idActionException = 0;
     int64_t idActionLog = 0;
     int64_t idActionWar = 0;
 
-    void setCountError(int count)
-    {
+    void setCountError(int count) {
         setCount(count, "Ошибок", buttonError);
     }
 
-    void setCountInfo(int count)
-    {
+    void setCountInfo(int count) {
         setCount(count, "Логов", buttonInfo);
     }
 
-    void setCountWarning(int count)
-    {
+    void setCountWarning(int count) {
         setCount(count, "Предупреждений", buttonWarning);
     }
 
-    void setCount(int count, std::string prefix, wxButton* button)
-    {
-        if (button)
-        {
+    void setCount(int count, std::string prefix, wxButton *button) {
+        if (button) {
             button->SetLabel(wxString::FromUTF8(prefix + ": " + std::to_string(count)));
         }
     }
 
 public:
-    //void showErrors();
-    wxDebugPanel(wxWindow *parent, wxWindowID id = wxID_ANY) : wxPanel(parent, id, wxDefaultPosition, wxSize(-1, 18))
-    {
+    wxDebugPanel(wxWindow *parent, wxWindowID id = wxID_ANY) : wxPanel(parent, id, wxDefaultPosition, wxSize(-1, 18)) {
         wxStaticLine *separator1 = new wxStaticLine(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLI_VERTICAL);
         wxStaticLine *separator2 = new wxStaticLine(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLI_VERTICAL);
 
@@ -73,39 +65,33 @@ public:
         setCountWarning(0);
 
         this->SetSizer(rowSizer);
-        
-        this->idActionException = assistant::js::exceptions->subscribe([this]
-        {
+
+        this->idActionException = assistant::js::exceptions->subscribe([this] {
             this->setCountError(assistant::js::exceptions->count());
         });
 
-        this->idActionLog = assistant::js::logs->subscribe([this]
-        {
+        this->idActionLog = assistant::js::logs->subscribe([this] {
             this->setCountInfo(assistant::js::logs->count());
         });
 
-        this->idActionWar = assistant::js::warning->subscribe([this]
-        {
+        this->idActionWar = assistant::js::warning->subscribe([this] {
             this->setCountWarning(assistant::js::warning->count());
         });
 
-        buttonError->Bind(wxEVT_BUTTON, [this](wxCommandEvent& event) 
-        {
+        buttonError->Bind(wxEVT_BUTTON, [this](wxCommandEvent &event) {
             this->showErrors();
         });
-        buttonInfo->Bind(wxEVT_BUTTON, [this](wxCommandEvent& event) 
-        {
+        buttonInfo->Bind(wxEVT_BUTTON, [this](wxCommandEvent &event) {
             auto frame = new wxLogsFrame(wxTheApp->GetMainTopWindow(), "Логи", assistant::js::logs);
             frame->Show();
         });
-        buttonWarning->Bind(wxEVT_BUTTON, [this](wxCommandEvent& event) 
-        {
+        buttonWarning->Bind(wxEVT_BUTTON, [this](wxCommandEvent &event) {
             auto frame = new wxLogsFrame(wxTheApp->GetMainTopWindow(), "Предупреждения", assistant::js::warning);
             frame->Show();
         });
     }
-    ~wxDebugPanel() 
-    {
+
+    ~wxDebugPanel() {
         assistant::js::exceptions->unsubscribe(this->idActionException);
         assistant::js::logs->unsubscribe(this->idActionLog);
         assistant::js::warning->unsubscribe(this->idActionWar);
@@ -115,19 +101,15 @@ public:
         buttonRefresh = nullptr;
     }
 
-    void showErrors()
-    {
+    void showErrors() {
         auto frame = new wxErrorsFrame(wxTheApp->GetMainTopWindow());
         frame->Show();
     }
 
     /** Установить функцию, при обновлении приложения */
-    void setClickRefresh(std::function<void()> fn)
-    {
-        if (buttonRefresh)
-        {
-            buttonRefresh->Bind(wxEVT_BUTTON, [this, fn](wxCommandEvent& event) 
-            {
+    void setClickRefresh(std::function<void()> fn) {
+        if (buttonRefresh) {
+            buttonRefresh->Bind(wxEVT_BUTTON, [this, fn](wxCommandEvent &event) {
                 fn();
             });
         }

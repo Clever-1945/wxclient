@@ -1,7 +1,7 @@
+#pragma once
 #include <string>
 
-struct JSException
-{
+struct JSException {
     std::string error;
     std::string stack;
 };

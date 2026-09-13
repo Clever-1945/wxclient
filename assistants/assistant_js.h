@@ -1,8 +1,8 @@
 #include <string>
 #include <optional>
 #include <variant>
-#include "JSException.h"
-#include "JsVariant.h"
+#include "Data/JSException.h"
+#include "Data/JsVariant.h"
 
 extern "C"
 {
@@ -22,12 +22,9 @@ namespace assistant
         ObservableValue<std::string>* logs = new ObservableValue<std::string>();
         ObservableValue<std::string>* warning = new ObservableValue<std::string>();
 
-        namespace _private
-        {
-            bool processException(JSContext *ctx, JSValue result)
-            {
-                if (JS_IsException(result))
-                {
+        namespace pprivate {
+            bool processException(JSContext *ctx, JSValue result) {
+                if (JS_IsException(result)) {
                     JSValue exception_message = JS_GetException(ctx);
                     JSValue exception_stack = JS_GetPropertyStr(ctx, exception_message, "stack");
 
@@ -38,8 +35,7 @@ namespace assistant
                     JS_FreeValue(ctx, exception_stack);
                     JS_FreeValue(ctx, result);
 
-                    if (message.has_value())
-                    {
+                    if (message.has_value()) {
                         JSException ex{};
                         ex.error = message.value();
                         ex.stack = stack.value_or("");
@@ -56,6 +52,31 @@ namespace assistant
         JSValue getUndefined()
         {
             return JS_UNDEFINED;
+        }
+
+        JSValue to_value(JSContext *ctx, std::string value)
+        {
+            JS_NewString(ctx, value.c_str());
+        }
+
+        JSValue to_value(JSContext *ctx, int value)
+        {
+            JS_NewInt32(ctx, value);
+        }
+
+        JSValue to_value(JSContext *ctx, long value)
+        {
+            JS_NewInt64(ctx, value);
+        }
+
+        JSValue to_value(JSContext *ctx, double value)
+        {
+            JS_NewFloat64(ctx, value);
+        }
+
+        JSValue to_value(JSContext *ctx, bool value)
+        {
+            JS_NewBool(ctx, value);
         }
 
         /** Факт того, что значение является промисом */
@@ -219,7 +240,7 @@ namespace assistant
             JSContext *pctx;
             while (JS_ExecutePendingJob(JS_GetRuntime(ctx), &pctx) > 0) {
             }
-            assistant::js::_private::processException(ctx, result);
+            assistant::js::pprivate::processException(ctx, result);
             return result;
         }
 
@@ -235,7 +256,7 @@ namespace assistant
             }
 
             JSValue result = JS_Eval(ctx, script.c_str(), script.length(), fileName.c_str(), JS_EVAL_TYPE_GLOBAL);
-            if (assistant::js::_private::processException(ctx, result))
+            if (assistant::js::pprivate::processException(ctx, result))
             {
                 JS_FreeValue(ctx, result);
             }
@@ -281,13 +302,32 @@ namespace assistant
         }
 
         /** Получить строку */
-        std::optional<std::string> to_string(JSContext *ctx, JSValue value, std::string propertyName)
-        {
+        std::optional<std::string> to_string(JSContext *ctx, JSValue value, std::string propertyName) {
             auto propertyValue = assistant::js::getValue(ctx, value, propertyName);
             auto returnValue = to_string(ctx, propertyValue);
 
             JS_FreeValue(ctx, propertyValue);
             return returnValue;
+        }
+
+        /** Вернуть функцию */
+        std::optional<JSValue> to_function(JSContext *ctx, JSValue value) {
+            if (JS_IsFunction(ctx, value)) {
+                return value;
+            }
+
+            return std::nullopt;
+        }
+
+        /** Вернуть функцию */
+        std::optional<JSValue> to_function(JSContext *ctx, JSValue value, std::string propertyName) {
+            auto fn = assistant::js::getValue(ctx, value, propertyName);
+            if (JS_IsFunction(ctx, fn)) {
+                return fn;
+            }
+
+            JS_FreeValue(ctx, fn);
+            return std::nullopt;
         }
 
         /** Получить целочисленное значение */
@@ -396,6 +436,22 @@ namespace assistant
 
             JS_FreeValue(ctx, constructor);
             return className;
+        }
+
+        /** Послать событие обратно в JS и передать в событии ссылку на компонент */
+        void emitEvent(wxEventControlJsData data, std::string eventName) {
+            auto context = data.clientData->getContext();
+            auto instance = data.clientData->getValue();
+            auto changed = assistant::js::to_function(context, instance, eventName);
+            if (changed.has_value()) {
+                JSValue argv[1] = {
+                        instance
+                };
+                auto changedFn = changed.value();
+                JSValue ret = assistant::js::call(context, changedFn, assistant::js::getUndefined(), 1, argv);
+                JS_FreeValue(context, ret);
+                JS_FreeValue(context, changedFn);
+            }
         }
     }
 }

@@ -201,6 +201,7 @@ public:
         JS_FreeValue(ctx, data); 
     }
 
+    /** Зарегистрировать портатип для класса */
     void registerPrototype(std::string className, std::string functionName, JSCFunction *func)
     {        
         JSValue global_obj = JS_GetGlobalObject(ctx);

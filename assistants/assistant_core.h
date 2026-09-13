@@ -11,6 +11,8 @@
 #include <optional>
 #include <ranges>
 #include <vector>
+#include "Data/JSValueClientData.h"
+#include "Data/wxEventControlJsData.h"
 
 namespace fs = std::filesystem;
 
@@ -19,43 +21,53 @@ namespace assistant
     namespace ui
     {
         /** Уведомление в отдельном окне */
-        void alert(std::string message, std::string title = "")
-        {
+        void alert(std::string message, std::string title = "") {
             wxMessageBox(wxString::FromUTF8(message), title.empty() ? wxT("Уведомление") : wxString::FromUTF8(title), wxOK | wxICON_INFORMATION);
         }
 
         /** Ошибка в отдельном окне */
-        void error(std::string message, std::string title = "")
-        {
+        void error(std::string message, std::string title = "") {
             wxMessageBox(wxString::FromUTF8(message), title.empty() ? wxT("Уведомление") : wxString::FromUTF8(title), wxOK | wxICON_ERROR);
         }
 
+        /** Из события получить информацию о контроле */
+        std::optional<wxEventControlJsData> getEventControlJsData(wxEvent &event) {
+            wxWindow *control = dynamic_cast<wxWindow *>(event.GetEventObject());
+            if (control) {
+                wxClientData* clientDataVoid = control->GetClientObject();
+                JSValueClientData* clientData = dynamic_cast<JSValueClientData*>(clientDataVoid);
+                if (clientData) {
+                    wxEventControlJsData data = {};
+                    data.control = control;
+                    data.clientDataVoid = clientDataVoid;
+                    data.clientData = clientData;
+                    return data;
+                }
+            }
+            return std::nullopt;
+        }
     }
 
     namespace core
     {
         const std::string _WHITESPACE = " \n\r\t\f\v";
-        
+
         /** Получить текст из файла ресурса */
-        std::string getContentResource(const std::string &resource_name)
-        {
+        std::string getContentResource(const std::string &resource_name) {
             HRSRC hRes = FindResourceA(NULL, resource_name.c_str(), "TEXT");
-            if (!hRes)
-            {
+            if (!hRes) {
                 return "";
             }
 
             HGLOBAL hData = LoadResource(NULL, hRes);
-            if (!hData)
-            {
+            if (!hData) {
                 return "";
             }
 
             const char *pData = reinterpret_cast<const char *>(LockResource(hData));
             DWORD dataSize = SizeofResource(NULL, hRes);
 
-            if (!pData || dataSize == 0)
-            {
+            if (!pData || dataSize == 0) {
                 return "";
             }
 
@@ -63,45 +75,36 @@ namespace assistant
         }
 
         /** Преобразовать строку в число */
-        std::optional<int> to_int(std::string text)
-        {
+        std::optional<int> to_int(std::string text) {
             int num = 0;
             auto [ptr, ec] = std::from_chars(text.data(), text.data() + text.size(), num);
 
-            if (ec == std::errc())
-            {
+            if (ec == std::errc()) {
                 return num;
             }
 
             return std::nullopt;
         }
 
-        std::string replaceAll(std::string str, const std::string from, const std::string to)
-        {
+        std::string replaceAll(std::string str, const std::string from, const std::string to) {
             if (from.empty())
                 return str;
             size_t start_pos = 0;
 
-            // Ищем подстроку во всей строке
-            while ((start_pos = str.find(from, start_pos)) != std::string::npos)
-            {
-                // Меняем найденное слово
+            while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
                 str.replace(start_pos, from.length(), to);
-                // Сдвигаем позицию поиска вперед, чтобы избежать бесконечного цикла
                 start_pos += to.length();
             }
 
             return str;
         }
 
-        std::vector<std::string> split(std::string text, std::string delim)
-        {
+        std::vector<std::string> split(std::string text, std::string delim) {
             std::vector<std::string> tokens;
             size_t start = 0;
             size_t end = text.find(delim);
 
-            while (end != std::string::npos)
-            {
+            while (end != std::string::npos) {
                 tokens.push_back(text.substr(start, end - start));
                 start = end + delim.length();
                 end = text.find(delim, start);
@@ -113,22 +116,19 @@ namespace assistant
         }
 
         /** Удаление пробелов СЛЕВА */
-        std::string ltrim(const std::string &s)
-        {
+        std::string ltrim(const std::string &s) {
             size_t start = s.find_first_not_of(_WHITESPACE);
             return (start == std::string::npos) ? "" : s.substr(start);
         }
 
         /** Удаление пробелов СПРАВА */
-        std::string rtrim(const std::string &s)
-        {
+        std::string rtrim(const std::string &s) {
             size_t end = s.find_last_not_of(_WHITESPACE);
             return (end == std::string::npos) ? "" : s.substr(0, end + 1);
         }
 
         /** Удаление пробелов С ОБЕИХ СТОРОН */
-        std::string trim(const std::string &s)
-        {
+        std::string trim(const std::string &s) {
             return rtrim(ltrim(s));
         }
     }

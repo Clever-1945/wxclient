@@ -5,7 +5,7 @@
 #include <wx/listctrl.h>
 #include <wx/textctrl.h>
 #include <wx/sizer.h>
-#include "../assistants/ObservableValue.h"
+#include "Data/ObservableValue.h"
 
 class wxLogsFrame : public wxFrame
 {

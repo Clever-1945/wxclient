@@ -2,14 +2,14 @@
 #include <string>
 #include <atomic>
 #include <thread>
-#include "assistants/ObservableValue.h"
+#include "Data/ObservableValue.h"
 #include "assistants/assistant_core.h"
 #include "assistants/assistant_js.h"
-#include "assistants/JSValueClientData.h"
+#include "Data/JSValueClientData.h"
 #include "controls/wxDebugPanel.h"
+#include "assistants/prototypes.h"
 #include "assistants/render.h"
 #include "assistants/quickJsEngine.h"
-#include "assistants/prototypes.h"
 
 
 class jsApp : public wxApp
@@ -179,8 +179,17 @@ private:
             return;
         }
         this->isRegisterPrototypes = true;
-        this->js->registerPrototype("Text", "getText", prototypes::text::get_text);
-        this->js->registerPrototype("Text", "setText", prototypes::text::set_text);
+        this->js->registerPrototype("Text", "getValue", prototypes::text::get_value);
+        this->js->registerPrototype("Text", "setValue", prototypes::text::set_value);
+
+        this->js->registerPrototype("ComboBox", "setItems", prototypes::comboBox::set_items);
+        this->js->registerPrototype("ComboBox", "getSelectedValue", prototypes::comboBox::get_selected_value);
+        this->js->registerPrototype("ComboBox", "setSelectedValue", prototypes::comboBox::set_selected_value);
+
+        this->js->registerPrototype("CheckBox", "getLabel", prototypes::checkBox::get_label);
+        this->js->registerPrototype("CheckBox", "getValue", prototypes::checkBox::get_value);
+        this->js->registerPrototype("CheckBox", "setLabel", prototypes::checkBox::set_label);
+        this->js->registerPrototype("CheckBox", "setValue", prototypes::checkBox::set_value);
     }
 
     void showAsyncMask(int countMask)
