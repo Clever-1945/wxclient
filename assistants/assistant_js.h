@@ -1,5 +1,6 @@
 #include <string>
 #include <optional>
+#include <variant>
 #include "JSException.h"
 #include "JsVariant.h"
 

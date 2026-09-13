@@ -80,7 +80,7 @@ struct JsVariant : std::variant<
     {
         if (std::holds_alternative<std::string>(*this))
         {
-            return std::get<std::string>(*this); // static_cast здесь не нужен
+            return std::get<std::string>(*this);
         }
         return std::nullopt;
     }
