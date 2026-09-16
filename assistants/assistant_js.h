@@ -1,3 +1,4 @@
+#pragma once
 #include <string>
 #include <optional>
 #include <variant>
@@ -22,7 +23,8 @@ namespace assistant
         ObservableValue<std::string>* logs = new ObservableValue<std::string>();
         ObservableValue<std::string>* warning = new ObservableValue<std::string>();
 
-        namespace pprivate {
+        namespace pprivate
+        {
             bool processException(JSContext *ctx, JSValue result) {
                 if (JS_IsException(result)) {
                     JSValue exception_message = JS_GetException(ctx);
@@ -49,34 +51,71 @@ namespace assistant
             }
         }
 
-        JSValue getUndefined()
-        {
+        JSValue getUndefined() {
             return JS_UNDEFINED;
         }
 
-        JSValue to_value(JSContext *ctx, std::string value)
-        {
-            JS_NewString(ctx, value.c_str());
+        JSValue to_value(JSContext *ctx, std::string value) {
+            return JS_NewString(ctx, value.c_str());
         }
 
-        JSValue to_value(JSContext *ctx, int value)
-        {
-            JS_NewInt32(ctx, value);
+        JSValue to_value(JSContext *ctx, int value) {
+            return JS_NewInt32(ctx, value);
         }
 
-        JSValue to_value(JSContext *ctx, long value)
-        {
-            JS_NewInt64(ctx, value);
+        JSValue to_value(JSContext *ctx, long value) {
+            return JS_NewInt64(ctx, value);
         }
 
-        JSValue to_value(JSContext *ctx, double value)
-        {
-            JS_NewFloat64(ctx, value);
+        JSValue to_value(JSContext *ctx, int64_t value) {
+            return JS_NewInt64(ctx, value);
         }
 
-        JSValue to_value(JSContext *ctx, bool value)
-        {
-            JS_NewBool(ctx, value);
+        JSValue to_value(JSContext *ctx, double value) {
+            return JS_NewFloat64(ctx, value);
+        }
+
+        JSValue to_value(JSContext *ctx, bool value) {
+            return JS_NewBool(ctx, value);
+        }
+
+        /** Преобразовать JSON строку в JS значение */
+        JSValue to_value_from_json(JSContext *ctx, std::string json) {
+            JSValue global_obj = JS_GetGlobalObject(ctx);
+            JSValue json_obj = JS_GetPropertyStr(ctx, global_obj, "JSON");
+            JSValue parse_fn = JS_GetPropertyStr(ctx, json_obj, "parse");
+            JSValue json_js_string = JS_NewString(ctx, json.c_str());
+            JSValue result = JS_Call(ctx, parse_fn, json_obj, 1, &json_js_string);
+
+            JS_FreeValue(ctx, global_obj);
+            JS_FreeValue(ctx, json_obj);
+            JS_FreeValue(ctx, parse_fn);
+            JS_FreeValue(ctx, json_js_string);
+
+            return result;
+        }
+
+        /** Преобразовать JS объект в JSON строку */
+        std::optional<std::string> to_json(JSContext *ctx, JSValue value) {
+            JSValue global_obj = JS_GetGlobalObject(ctx);
+            JSValue json_obj = JS_GetPropertyStr(ctx, global_obj, "JSON");
+            JSValue stringify_fn = JS_GetPropertyStr(ctx, json_obj, "stringify");
+
+            JSValue argv[3];
+            argv[0] = value;
+            argv[1] = JS_NULL;
+            argv[2] = JS_NewInt32(ctx, 4);
+
+            JSValue json_js_string = JS_Call(ctx, stringify_fn, json_obj, 3, argv);
+            auto text_json = to_string(ctx, json_js_string);
+
+            JS_FreeValue(ctx, argv[2]);
+            JS_FreeValue(ctx, global_obj);
+            JS_FreeValue(ctx, json_obj);
+            JS_FreeValue(ctx, stringify_fn);
+            JS_FreeValue(ctx, json_js_string);
+
+            return text_json;
         }
 
         /** Факт того, что значение является промисом */
@@ -247,7 +286,7 @@ namespace assistant
         /** Выполнить скрипт из файла */
         void evalFile(JSContext *ctx, std::string fileName)
         {
-            auto executableDirectory = assistant::directory::getExecutable();
+            auto executableDirectory = assistant::directory::getDirectoryExecutable();
             auto fullFileName = assistant::path::combine(executableDirectory, fileName);
             std::string script = assistant::file::read(fullFileName);
             if(script.empty())
@@ -333,12 +372,13 @@ namespace assistant
         /** Получить целочисленное значение */
         std::optional<int> to_int(JSContext *ctx, JSValue value)
         {
-            int result = 0;
-            int error = JS_ToInt32(ctx, &result, value);
             if(JS_IsUndefined(value))
             {
                 return std::nullopt;
             }
+
+            int result = 0;
+            int error = JS_ToInt32(ctx, &result, value);
 
             if (error < 0)
             {
@@ -389,10 +429,9 @@ namespace assistant
         /** Получить булевное значение */
         std::optional<bool> to_bool(JSContext *ctx, JSValue value)
         {
-            bool result = false;
             if (JS_IsBool(value))
             {
-                return JS_ToBool(ctx, value) ? true : false;
+                return JS_ToBool(ctx, value) != 0 ? true : false;
             }
             return std::nullopt;
         }
@@ -402,6 +441,30 @@ namespace assistant
         {
             auto propertyValue = assistant::js::getValue(ctx, value, propertyName);
             auto returnValue = to_bool(ctx, propertyValue);
+
+            JS_FreeValue(ctx, propertyValue);
+            return returnValue;
+        }
+
+        /** Получить дробное число */
+        std::optional<double> to_double(JSContext *ctx, JSValue value) {
+            if (JS_IsUndefined(value)) {
+                return std::nullopt;
+            }
+
+            double result = 0;
+            int error = JS_ToFloat64(ctx, &result, value);
+            if (error < 0) {
+                return std::nullopt;
+            }
+
+            return result;
+        }
+
+        /** Получить дробное число */
+        std::optional<double> to_double(JSContext *ctx, JSValue value, std::string propertyName) {
+            auto propertyValue = assistant::js::getValue(ctx, value, propertyName);
+            auto returnValue = to_double(ctx, propertyValue);
 
             JS_FreeValue(ctx, propertyValue);
             return returnValue;

@@ -19,5 +19,3 @@ app.initMainFrame(new Frame({
     ]
 }));
 
-
-

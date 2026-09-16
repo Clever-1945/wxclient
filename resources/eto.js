@@ -1,9 +1,20 @@
 /**
+ * @typedef {Object} ApplicationStorage
+ * @property {function(string): void} add - Добавить объект в хранилизе. Первый параметр имя коллекции, второй объект
+ * @property {function(string): void} filter - Фильтр объектов. Первый параметр это имя коллекции, второй опциональнй ( '$.age' = 25 )
+ * @property {function(string): void} remove - Удалить по Id. Первый параметр имя коллекции, второй Id
+ * @property {function(string): void} update - Обновить объект по Id. Первый параметр имя коллекции, второй объект, в котором есть Id
+ * @property {function(string): void} getById - Получить объект по Id. Первый параметр имя коллекции, второй Id
+ */
+
+
+/**
  * @typedef {Object} Application
  * @property {function(string): void} alert - Выводит системное уведомление
  * @property {function(Object): void} initMainFrame - Инициализировать основную форму приложения 
  * @property {function(string): Object} findByName - Найти компонент по имени
  * @property {function(function): Promise} startAsync - Функция для выполнения асинхронной операции
+ * @property {ApplicationStorage} storage - Работа с хранилищем
  */
 
 

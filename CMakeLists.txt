@@ -71,4 +71,6 @@ target_link_libraries(wxclient
         gdiplus
         oleacc
         msimg32
+        # это минимальная БД, для сохранения каких то настроек. хочу аналог localStorage
+        sqlite3
         )

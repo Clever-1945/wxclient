@@ -108,10 +108,12 @@ namespace assistant
                 tokens.push_back(text.substr(start, end - start));
                 start = end + delim.length();
                 end = text.find(delim, start);
+                continue;
             }
-
-            // Не забываем добавить последний кусочек строки
-            tokens.push_back(text);
+            auto lastText = text.substr(start);
+            if (!lastText.empty()) {
+                tokens.push_back(lastText);
+            }
             return tokens;
         }
 
@@ -187,7 +189,7 @@ namespace assistant
         }
 
         /** получить папку запуска нашего приложения */
-        std::string getExecutable()
+        std::string getDirectoryExecutable()
         {
             auto executablePath = wxStandardPaths::Get().GetExecutablePath();
             auto fileName = std::string(executablePath.ToUTF8());

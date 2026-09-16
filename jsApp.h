@@ -5,6 +5,8 @@
 #include "Data/ObservableValue.h"
 #include "assistants/assistant_core.h"
 #include "assistants/assistant_js.h"
+#include "assistants/assistant_db.h"
+#include "assistants/assistant_app.h"
 #include "Data/JSValueClientData.h"
 #include "controls/wxDebugPanel.h"
 #include "assistants/prototypes.h"
@@ -20,14 +22,6 @@ private:
     bool isRegisterPrototypes = false;
     inline static std::atomic<int> counterAsync{0};
 
-    static JSValue js_alert(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
-    {
-        // auto app = QuickJsEngine::getContextOpaque<jsApp>(ctx);
-        auto text = assistant::js::to_string(ctx, assistant::js::getValue(argc, argv, 0));
-        assistant::ui::alert(text.value_or(""));
-        return assistant::js::getUndefined();
-    }
-
     static JSValue js_init_main_frame(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
     {        
         auto app = QuickJsEngine::getContextOpaque<jsApp>(ctx);
@@ -39,14 +33,6 @@ private:
             data = render::frame::getFrameData(app->mainFrame);
         }
 
-        auto run = assistant::js::getValue(ctx, value, "run");
-        if (JS_IsFunction(ctx, run))
-        {
-            JSValue ret = assistant::js::call(ctx, run, assistant::js::getUndefined(), 0, nullptr);
-            JS_FreeValue(ctx, ret);
-        }
-
-        JS_FreeValue(ctx, run);
         return assistant::js::getUndefined();
     }
 
@@ -127,46 +113,21 @@ private:
         return promise;
     }
 
-    static JSValue js_console_log(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
-    {
-        if (argc > 0)
-        {
-            auto text = assistant::js::to_string(ctx, argv[0]);
-            assistant::js::logs->set(text.value_or(""));
-        }
-
-        return assistant::js::getUndefined();
-    }
-
-    static JSValue js_console_war(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
-    {
-        if (argc > 0)
-        {
-            auto text = assistant::js::to_string(ctx, argv[0]);
-            assistant::js::warning->set(text.value_or(""));
-        }
-
-        return assistant::js::getUndefined();
-    }
-    
     /** Факт того, что джаваскрипты готовы к работе */
-    void prepareScripts()
-    {
-        auto executablePath = assistant::directory::getExecutable();
+    void prepareScripts() {
+        auto executablePath = assistant::directory::getDirectoryExecutable();
         auto js_directory = assistant::path::combine(executablePath, "js");
         assistant::directory::create(js_directory);
 
         auto eto_js = assistant::path::combine(js_directory, "eto.js");
         auto main_js = assistant::path::combine(js_directory, "main.js");
 
-        if (!assistant::file::exists(eto_js))
-        {
+        if (!assistant::file::exists(eto_js)) {
             auto content = assistant::core::getContentResource("ETO_SCRIPT");
             assistant::file::write(eto_js, content);
         }
 
-        if (!assistant::file::exists(main_js))
-        {
+        if (!assistant::file::exists(main_js)) {
             auto content = assistant::core::getContentResource("MAIN_SCRIPT");
             assistant::file::write(main_js, content);
         }
@@ -254,12 +215,19 @@ public:
         }
         js->setContextOpaque(this);
 
-        js->registerFn("app", "alert", js_alert);
+        js->registerFn("app", "alert", assistant::app::alert);
+        js->registerFn("app", "error", assistant::app::error);
         js->registerFn("app", "initMainFrame", js_init_main_frame);
         js->registerFn("app", "findByName", js_find_by_name);
         js->registerFn("app", "startAsync", js_start_async);
-        js->registerFn("console", "log", js_console_log);
-        js->registerFn("console", "war", js_console_war);
+        js->registerFn("console", "log", assistant::console::log);
+        js->registerFn("console", "war", assistant::console::war);
+
+        js->registerFn("app.storage", "add", assistant::db::add);
+        js->registerFn("app.storage", "filter", assistant::db::filter);
+        js->registerFn("app.storage", "remove", assistant::db::remove);
+        js->registerFn("app.storage", "update", assistant::db::update);
+        js->registerFn("app.storage", "getById", assistant::db::getById);
 
         js->registerPromiseFn("app", "testAsync", [](std::vector<JsVariant> args) -> JsVariant 
         {
