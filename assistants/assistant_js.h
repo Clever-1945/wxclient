@@ -2,6 +2,7 @@
 #include <string>
 #include <optional>
 #include <variant>
+#include "Data/ObservableValue.h"
 #include "Data/JSException.h"
 #include "Data/JsVariant.h"
 
@@ -48,6 +49,14 @@ namespace assistant
                 }
 
                 return false;
+            }
+        }
+
+        /** Завершить все фоновые микротаски */
+        void pendingJob (JSContext *ctx) {
+            JSContext *pctx;
+            while (JS_ExecutePendingJob(JS_GetRuntime(ctx), &pctx) > 0) {
+
             }
         }
 
@@ -301,6 +310,7 @@ namespace assistant
             }
 
             JS_FreeValue(ctx, result);
+            assistant::js::pendingJob(ctx);
         }
         
         /** Получить значение из массива */

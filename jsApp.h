@@ -7,6 +7,7 @@
 #include "assistants/assistant_js.h"
 #include "assistants/assistant_db.h"
 #include "assistants/assistant_app.h"
+#include "assistants/assistant_cmd.h"
 #include "Data/JSValueClientData.h"
 #include "controls/wxDebugPanel.h"
 #include "assistants/prototypes.h"
@@ -228,6 +229,7 @@ public:
         js->registerFn("app.storage", "remove", assistant::db::remove);
         js->registerFn("app.storage", "update", assistant::db::update);
         js->registerFn("app.storage", "getById", assistant::db::getById);
+        js->registerFn("app.cmd", "run", assistant::cmd::run);
 
         js->registerPromiseFn("app", "testAsync", [](std::vector<JsVariant> args) -> JsVariant 
         {
