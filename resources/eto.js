@@ -114,13 +114,13 @@ class Text {
    * @param {string} value - текст для поля
    * @returns {undefined} Результат
    */
-    setValue = function (value) { }
+    setValue (value) { }
 
     /**
    * Получить значение из текстового поля
    * @returns {string} Текст из поля
    */
-    getValue = function () { }
+    getValue () { }
 }
 
 /**
@@ -175,27 +175,27 @@ class ComboBox {
      * Получить подсказку
      * @returns {undefined} Результат
      */
-    getLabel = function () { }
+    getLabel () { }
 
     /**
      * Установить подсказку
      * @param {string} label - подсказка
      * @returns {undefined} Результат
      */
-    setLabel = function (label) { }
+    setLabel (label) { }
 
     /**
      * Получить начение
      * @returns {string} Результат
      */
-    getValue = function () { }
+    getValue () { }
 
     /**
      * Установить значение
      * @param {string} value - Установить новое активное значение
      * @returns {undefined} Результат
      */
-    setValue = function (value) { }
+    setValue (value) { }
 }
 
 /**
@@ -220,7 +220,61 @@ class Button {
         Object.assign(this, config);
     }
 }
-    
+
+/**
+ * Git репозиторий
+ * @property {string} - Полный путь до любого файла в репозитории
+ * */
+class GitRepository {
+    _repositoryFileName;
+    _topLevelPath;
+    constructor(repositoryFileName) {
+        this._repositoryFileName = repositoryFileName;
+    }
+
+    /**
+     * Выполнить команду в git консоли
+     * @param {string} - подсказка
+     * @returns {Promise} Результат
+     */
+    async runGitCommand(command) {}
+
+    /** Получить папку верхнего уровня репозитория */
+    async getTopLevelPath() {
+        this._topLevelPath = this._topLevelPath || ((await this.runGitCommand('rev-parse --show-toplevel')) || '').trim();
+        return this._topLevelPath;
+    }
+
+    /** Получение списка бранчей */
+    async getListBranch() {
+        const listLocal = (await this.runGitCommand("branch")).split('\n').map(x => x.trim()).filter(x => !!x);
+        const listRemote = (await this.runGitCommand("branch -r")).split('\n').map(x => x.trim()).filter(x => !!x);
+        if (listRemote.length >= 1) {
+            listRemote.splice(0, 1);
+        }
+        const listAllBranch = [listLocal, listRemote];
+        const list = [];
+
+        for(let i = 0 ; i < listAllBranch.length ; i++) {
+            const listBranch = listAllBranch[i];
+            for(let j = 0 ; j < listBranch.length ; j++) {
+                const branch = listBranch[j];
+
+                let branchName = branch.trim();
+                let isCurrent = branchName.startsWith('*');
+                branchName = branchName.trimStart('*');
+
+                list.push({
+                    isCurrent: isCurrent,
+                    name: branchName,
+                    isRemote: listBranch === listRemote
+                });
+            }
+        }
+
+        return list;
+    }
+}
 
 globalThis.Text = Text;
 globalThis.Button = Button;
@@ -228,4 +282,5 @@ globalThis.ComboBox = ComboBox;
 globalThis.Label = Label;
 globalThis.GridBagLayout = GridBagLayout;
 globalThis.Frame = Frame;
+globalThis.GitRepository = GitRepository;
 

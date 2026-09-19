@@ -137,23 +137,19 @@ namespace assistant
 
     namespace file
     {
-        bool exists(std::string fileName)
-        {
+        bool exists(std::string fileName) {
             return fs::exists(fileName);
         }
 
         /** Создать новый файл и записать туда контент */
-        bool write(const std::string &filePath, const std::string &content)
-        {
+        bool write(const std::string &filePath, const std::string &content) {
             fs::path p(filePath);
-            if (p.has_parent_path())
-            {
+            if (p.has_parent_path()) {
                 fs::create_directories(p.parent_path());
             }
 
             std::ofstream out(filePath, std::ios::out | std::ios::trunc | std::ios::binary);
-            if (!out.is_open())
-            {
+            if (!out.is_open()) {
                 return false;
             }
             out << content;
@@ -162,11 +158,9 @@ namespace assistant
         }
 
         /** Прочитать контент из файла */
-        std::string read(const std::string &filePath)
-        {
+        std::string read(const std::string &filePath) {
             std::ifstream in(filePath, std::ios::in | std::ios::binary);
-            if (!in.is_open())
-            {
+            if (!in.is_open()) {
                 return "";
             }
 
@@ -178,8 +172,7 @@ namespace assistant
 
     namespace directory
     {
-        bool exists(std::string directoryName)
-        {
+        bool exists(std::string directoryName) {
             return fs::is_directory(directoryName);
         }
 
@@ -201,37 +194,39 @@ namespace assistant
     namespace path
     {
         /**сложить два пути */
-        std::string combine(std::string left, std::string right)
-        {
+        std::string combine(std::string left, std::string right) {
             fs::path full_path = fs::path(left) / right;
             std::string result = full_path.string();
             return result;
         }
 
         /**сложить два пути */
-        std::string combine(std::string left, std::string right, std::string right1)
-        {
+        std::string combine(std::string left, std::string right, std::string right1) {
             fs::path full_path = fs::path(left) / right / right1;
             std::string result = full_path.string();
             return result;
         }
 
         /**сложить два пути */
-        std::string combine(std::string left, std::string right, std::string right1, std::string right2)
-        {
+        std::string combine(std::string left, std::string right, std::string right1, std::string right2) {
             fs::path full_path = fs::path(left) / right / right1 / right2;
             std::string result = full_path.string();
             return result;
         }
 
         /**сложить два пути */
-        std::string combine(std::string left, std::string right, std::string right1, std::string right2, std::string right3)
-        {
+        std::string combine(std::string left, std::string right, std::string right1, std::string right2, std::string right3) {
             fs::path full_path = fs::path(left) / right / right1 / right2 / right3;
             std::string result = full_path.string();
             return result;
         }
+
+        /** Получить папку от полного пути файла или родительскую папку от указанной папки */
+        std::string parent(std::string path) {
+            std::filesystem::path p(path);
+            std::filesystem::path dir = p.parent_path();
+            return dir.string();
+        }
     }
 }
 
-// namespace assistant

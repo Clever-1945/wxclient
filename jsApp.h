@@ -42,6 +42,7 @@ private:
         auto value = assistant::js::getValue(argc, argv, 0);
         auto name = assistant::js::to_string(ctx, value);
         wxWindow* control = wxWindow::FindWindowByName(wxString::FromUTF8(name.value().c_str()), nullptr);
+        auto className = assistant::js::getClassName(ctx, render::base::getValue(control));
         return JS_DupValue(ctx, render::base::getValue(control));
     }
 
@@ -63,12 +64,9 @@ private:
 
         if (argc < 1 || !app)
         {
-            JSValue argv_error[1] =
-            {
-                JS_NewBool(ctx, false)
-            };
-            auto return_value = assistant::js::call(ctx, resolving_funcs[0], assistant::js::getUndefined(), 1, argv_error);
-            JS_FreeValue(ctx, argv_error[0]);
+            auto parameter = JS_NewBool(ctx, false);
+            auto return_value = assistant::js::call(ctx, resolving_funcs[0], assistant::js::getUndefined(), parameter);
+            JS_FreeValue(ctx, parameter);
             JS_FreeValue(ctx, return_value);
             return promise;
         }
@@ -76,12 +74,9 @@ private:
         JSValue function = argv[0];
         if (!JS_IsFunction(ctx, function))
         {
-            JSValue argv_error[1] =
-            {
-                JS_NewBool(ctx, false)
-            };
-            auto return_value = assistant::js::call(ctx, resolving_funcs[0], assistant::js::getUndefined(), 1, argv_error);
-            JS_FreeValue(ctx, argv_error[0]);
+            auto parameter = JS_NewBool(ctx, false);
+            auto return_value = assistant::js::call(ctx, resolving_funcs[0], assistant::js::getUndefined(), parameter);
+            JS_FreeValue(ctx, parameter);
             JS_FreeValue(ctx, return_value);
             return promise;
         }
@@ -89,7 +84,7 @@ private:
         JSValue resolve_func = resolving_funcs[0];
         JSValue reject_func = resolving_funcs[1];
 
-        auto value_promise = assistant::js::call(ctx, function, assistant::js::getUndefined(), 0, nullptr);
+        auto value_promise = assistant::js::call(ctx, function, assistant::js::getUndefined(), nullptr, 0);
         if (assistant::js::is_promise(ctx, value_promise))
         {
             JSValue finally_fn = JS_GetPropertyStr(ctx, value_promise, "finally");
@@ -98,7 +93,7 @@ private:
             {
                 app->showAsyncMask(1);
                 JSValue finally_cb = JS_NewCFunctionData(ctx, on_finally_callback, 0, 0, 0, nullptr);
-                JSValue finally_ret = assistant::js::call(ctx, finally_fn, value_promise, 1, &finally_cb);
+                JSValue finally_ret = assistant::js::call(ctx, finally_fn, value_promise, &finally_cb, 1);
 
                 JS_FreeValue(ctx, finally_ret);
                 JS_FreeValue(ctx, finally_cb);
@@ -152,6 +147,7 @@ private:
         this->js->registerPrototype("CheckBox", "getValue", prototypes::checkBox::get_value);
         this->js->registerPrototype("CheckBox", "setLabel", prototypes::checkBox::set_label);
         this->js->registerPrototype("CheckBox", "setValue", prototypes::checkBox::set_value);
+        assistant::git::registrationPrototypes(this->js->getCtx());
     }
 
     void showAsyncMask(int countMask)
@@ -231,9 +227,10 @@ public:
         js->registerFn("app.storage", "getById", assistant::db::getById);
         js->registerFn("app.cmd", "run", assistant::cmd::run);
 
-        js->registerPromiseFn("app", "testAsync", [](std::vector<JsVariant> args) -> JsVariant 
+        js->registerPromiseInObject("app", "testAsync", [](JSContext* ctx, JSValue this_instance, std::vector<JsVariant> args) -> JsVariant
         {
-            std::this_thread::sleep_for(std::chrono::seconds(5));
+            auto seconds = args.size() > 1 ? args.at(1).to_int().value_or(0) : 0;
+            std::this_thread::sleep_for(std::chrono::seconds(seconds));
             return JsVariant(std::string("test"));
         });
 
