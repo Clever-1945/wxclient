@@ -18,6 +18,7 @@ private:
     int64_t idActionException = 0;
     int64_t idActionLog = 0;
     int64_t idActionWar = 0;
+    std::function<void()>* refreshFunction = nullptr;
 
     void setCountError(int count) {
         setCount(count, "Ошибок", buttonError);
@@ -99,6 +100,7 @@ public:
         buttonInfo = nullptr;
         buttonWarning = nullptr;
         buttonRefresh = nullptr;
+        delete this->refreshFunction;
     }
 
     void showErrors() {
@@ -107,11 +109,21 @@ public:
     }
 
     /** Установить функцию, при обновлении приложения */
-    void setClickRefresh(std::function<void()> fn) {
+    void setClickRefresh(const std::function<void()>& fn) {
         if (buttonRefresh) {
-            buttonRefresh->Bind(wxEVT_BUTTON, [this, fn](wxCommandEvent &event) {
-                fn();
+            this->refreshFunction = new std::function<void()>(fn);
+            buttonRefresh->Bind(wxEVT_BUTTON, [this](wxCommandEvent &event) {
+                if (this->refreshFunction) {
+                    (*refreshFunction)();
+                }
             });
+        }
+    }
+
+    /** Обновить приложение */
+    void refresh() {
+        if (this->refreshFunction) {
+            (*refreshFunction)();
         }
     }
 };

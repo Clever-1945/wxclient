@@ -34,8 +34,17 @@ namespace render
     namespace base
     {
         wxSizer *apply(wxSizer *sizer, JSContext *ctx, JSValue instance) {
+            auto widthInt = assistant::js::to_int(ctx, instance, "width");
+            auto heightInt = assistant::js::to_int(ctx, instance, "height");
+            if (widthInt.has_value() || heightInt.has_value()) {
+                sizer->SetMinSize(
+                        widthInt.value_or(sizer->GetSize().GetWidth()),
+                        heightInt.value_or(sizer->GetSize().GetHeight())
+                );
+            }
+
             auto clientData = new JSValueClientData(ctx, instance);
-            sizer->SetClientData(clientData);
+            sizer->SetClientObject(clientData);
 
             // Устанавливаем адрес ссылки в объект, в служебное поле
             int64_t address = reinterpret_cast<int64_t>(sizer);
@@ -278,7 +287,10 @@ namespace render
                 {
                     auto gridBag = render::gridBag::create();
                     sizer = render::base::apply(gridBag, ctx, item);
-                    render::gridBag::apply(gridBag, ctx, item, parent);
+
+                    auto gridItems = assistant::js::getValue(ctx, item, "items");
+                    render::gridBag::apply(gridBag, ctx, gridItems, parent);
+                    JS_FreeValue(ctx, gridItems);
                 }
 
                 if (control)
@@ -400,13 +412,12 @@ namespace render
             panel_sizer->Add(grid, 1, wxEXPAND, 0);
             auto debugPanel = new wxDebugPanel(panel, wxID_ANY);
             panel_sizer->Add(debugPanel, 0, wxEXPAND, 0);
-            
-            frame->Layout();
-            
+
             frameData->setProgressBar(progressBar);
             frameData->setPanelSizer(panel_sizer);
             frameData->setPanel(panel);
             frameData->setDebugPanel(debugPanel);
+            frame->Layout();
         }
     }
 }

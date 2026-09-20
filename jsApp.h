@@ -139,9 +139,7 @@ private:
         this->js->registerPrototype("Text", "getValue", prototypes::text::get_value);
         this->js->registerPrototype("Text", "setValue", prototypes::text::set_value);
 
-        this->js->registerPrototype("ComboBox", "setItems", prototypes::comboBox::set_items);
-        this->js->registerPrototype("ComboBox", "getSelectedValue", prototypes::comboBox::get_selected_value);
-        this->js->registerPrototype("ComboBox", "setSelectedValue", prototypes::comboBox::set_selected_value);
+        prototypes::comboBox::registration(this->js->getCtx());
 
         this->js->registerPrototype("CheckBox", "getLabel", prototypes::checkBox::get_label);
         this->js->registerPrototype("CheckBox", "getValue", prototypes::checkBox::get_value);
@@ -168,6 +166,24 @@ private:
         });
     }
 
+    void refreshScript() {
+        for (wxWindowList::compatibility_iterator node = wxTopLevelWindows.GetFirst(); node; node = node->GetNext()) {
+            wxFrame *frame = dynamic_cast<wxFrame *>(node->GetData());
+            if (frame != this->mainFrame) {
+                frame->Close();
+            }
+        }
+
+        this->mainFrame->DestroyChildren();
+
+        wxTheApp->CallAfter([]() {
+            jsApp *app = dynamic_cast<jsApp *>(wxTheApp);
+            if (app) {
+                app->runMainJs();
+            }
+        });
+    }
+
     /** Запустить скрипт приложения */
     void runMainJs()
     {
@@ -177,28 +193,32 @@ private:
         {
             data->setClickRefresh([this] 
             {
-                for (wxWindowList::compatibility_iterator node = wxTopLevelWindows.GetFirst(); node; node = node->GetNext())
-                {
-                    wxFrame *frame = dynamic_cast<wxFrame*>(node->GetData());                
-                    if (frame != this->mainFrame)
-                    {
-                        frame->Close();
-                    }
+                jsApp *app = dynamic_cast<jsApp *>(wxTheApp);
+                if (app) {
+                    app->refreshScript();
                 }
-
-                this->mainFrame->DestroyChildren();
-
-                wxTheApp->CallAfter([]() 
-                {
-                    jsApp* app = dynamic_cast<jsApp*>(wxTheApp);
-                    if (app) 
-                    {
-                        app->runMainJs();
-                    }
-                });
             });
         }
     }
+
+    int FilterEvent(wxEvent& event) {
+        if (event.GetEventType() == wxEVT_KEY_DOWN) {
+            wxKeyEvent& keyEvent = static_cast<wxKeyEvent&>(event);
+            if (keyEvent.GetKeyCode() == WXK_F5) {
+                this->refreshScript();
+                return Event_Processed;
+            }
+            if (keyEvent.GetKeyCode() == WXK_F11) {
+                auto data = render::frame::getFrameData(this->mainFrame);
+                if (data) {
+                    data->changeShowDebugPanel();
+                    return Event_Processed;
+                }
+            }
+        }
+        return Event_Skip;
+    }
+
 public:
     virtual bool OnInit()
     {
@@ -214,9 +234,12 @@ public:
 
         js->registerFn("app", "alert", assistant::app::alert);
         js->registerFn("app", "error", assistant::app::error);
+        js->registerFn("app", "getArguments", assistant::app::getArguments);
+        js->registerFn("app", "exit", assistant::app::exit);
         js->registerFn("app", "initMainFrame", js_init_main_frame);
         js->registerFn("app", "findByName", js_find_by_name);
         js->registerFn("app", "startAsync", js_start_async);
+
         js->registerFn("console", "log", assistant::console::log);
         js->registerFn("console", "war", assistant::console::war);
 
@@ -226,6 +249,9 @@ public:
         js->registerFn("app.storage", "update", assistant::db::update);
         js->registerFn("app.storage", "getById", assistant::db::getById);
         js->registerFn("app.cmd", "run", assistant::cmd::run);
+
+        assistant::file::registration(js->getCtx());
+        assistant::directory::registration(js->getCtx());
 
         js->registerPromiseInObject("app", "testAsync", [](JSContext* ctx, JSValue this_instance, std::vector<JsVariant> args) -> JsVariant
         {

@@ -11,6 +11,7 @@
 #include <optional>
 #include <ranges>
 #include <vector>
+#include <regex>
 #include "Data/JSValueClientData.h"
 #include "Data/wxEventControlJsData.h"
 
@@ -133,12 +134,70 @@ namespace assistant
         std::string trim(const std::string &s) {
             return rtrim(ltrim(s));
         }
+
+        /** Получить регулярное выражение по маске поиску файлов или папок */
+        std::optional<std::regex> getRegexMask(std::string mask) {
+            std::string regexStr = "";
+            for (char c : mask) {
+                switch (c) {
+                    case '*':  regexStr += ".*";  break;
+                    case '?':  regexStr += ".";   break;
+                    case '.':  regexStr += "\\."; break;
+                    case '\\': regexStr += "\\\\"; break;
+                    case '^':  regexStr += "\\^"; break;
+                    case '$':  regexStr += "\\$"; break;
+                    case '+':  regexStr += "\\+"; break;
+                    default:   regexStr += c;     break;
+                }
+            }
+            if (regexStr.empty()) {
+                return std::nullopt;
+            }
+
+            std::regex r(regexStr);
+            return r;
+        }
     }
 
     namespace file
     {
         bool exists(std::string fileName) {
-            return fs::exists(fileName);
+            return fs::is_regular_file(fileName) && fs::exists(fileName);
+        }
+
+        /** Получить папку, где расположен файл */
+        std::string directory (std::string fileName) {
+            if (assistant::file::exists(fileName)) {
+                fs::path p(fileName);
+                return p.parent_path().string();
+            }
+            return "";
+        }
+
+        /** Получить расширение файла */
+        std::string extension (std::string fileName) {
+            if (assistant::file::exists(fileName)) {
+                fs::path p(fileName);
+                return p.extension().string();
+            }
+            return "";
+        }
+
+        /** Получить имя файла по пному пути файла */
+        std::string fileName (std::string fileName) {
+            if (assistant::file::exists(fileName)) {
+                fs::path p(fileName);
+                return p.filename().string();
+            }
+            return "";
+        }
+
+        int64_t size (std::string fileName) {
+            if (assistant::file::exists(fileName)) {
+                fs::path p(fileName);
+                return file_size(p);
+            }
+            return 0;
         }
 
         /** Создать новый файл и записать туда контент */
@@ -170,24 +229,50 @@ namespace assistant
         }
     }
 
-    namespace directory
-    {
+    namespace directory {
         bool exists(std::string directoryName) {
-            return fs::is_directory(directoryName);
+            return fs::is_directory(directoryName) && fs::exists(directoryName);
         }
 
-        bool create(std::string directoryName)
-        {
+        bool create(std::string directoryName) {
             return fs::create_directories(directoryName);
         }
 
         /** получить папку запуска нашего приложения */
-        std::string getDirectoryExecutable()
-        {
+        std::string getDirectoryExecutable() {
             auto executablePath = wxStandardPaths::Get().GetExecutablePath();
             auto fileName = std::string(executablePath.ToUTF8());
             fs::path p(fileName);
             return p.parent_path().string();
+        }
+
+        /** Получить список файлов в папке */
+        std::vector<std::string> getListFile(std::string directoryName, std::string mask) {
+            std::vector<std::string> fileList;
+            std::optional<std::regex> maskRegex = assistant::core::getRegexMask(mask);
+
+            try {
+                if (assistant::directory::exists(directoryName)) {
+                    for (const auto &entry: fs::recursive_directory_iterator(directoryName)) {
+                        if (entry.is_regular_file()) {
+                            std::string fullPath = entry.path().string();
+                            auto fileName = entry.path().filename().string();
+
+                            if (maskRegex.has_value()) {
+                                if (std::regex_match(fileName, maskRegex.value())) {
+                                    fileList.push_back(fullPath);
+                                }
+                            } else {
+                                fileList.push_back(fullPath);
+                            }
+                        }
+                    }
+
+                }
+            } catch (const fs::filesystem_error &e) {
+            }
+
+            return fileList;
         }
     }
 

@@ -164,6 +164,20 @@ namespace assistant
             return JS_NewBool(ctx, value);
         }
 
+        JSValue to_value(JSContext *ctx, std::vector<std::string> value) {
+            JSValue js_arr = JS_NewArray(ctx);
+            if (JS_IsException(js_arr)) {
+                return JS_UNDEFINED;
+            }
+
+            auto size = value.size();
+            for (int i = 0; i < size; i++) {
+                JSValue elem = assistant::js::to_value(ctx, value[i]);
+                JS_DefinePropertyValueUint32(ctx, js_arr, i, elem, JS_PROP_C_W_E);
+            }
+            return js_arr;
+        }
+
         /** Преобразовать JSON строку в JS значение */
         JSValue to_value_from_json(JSContext *ctx, std::string json) {
             JSValue global_obj = JS_GetGlobalObject(ctx);

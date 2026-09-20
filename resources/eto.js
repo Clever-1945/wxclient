@@ -7,6 +7,24 @@
  * @property {function(string): void} getById - Получить объект по Id. Первый параметр имя коллекции, второй Id
  */
 
+/**
+ * @typedef {Object} ApplicationFile
+ * @property {function(string): boolean} exists - Проверка файла на существование
+ * @property {function(string, string): void} write - Записать контент в файл
+ * @property {function(string): string} read - Прочитать контент из файла
+ * @property {function(string): string} extension - Расширение файла
+ * @property {function(string): string} fileName - Имя файла в папке
+ * @property {function(string): string} size - Размер файла
+ * @property {function(string): string} directory - Получить папку где есть файл
+ * */
+
+/**
+ * @typedef {Object} ApplicationDirectory
+ * @property {function(string): boolean} exists - Проверка папку на существование
+ * @property {function(string): boolean} create - Создание папки
+ * @property {function(string): string} getDirectoryExecutable - Папка из которой запущено приложение
+ * @property {function(string): Array} getListFile - Список файлов в папке
+ * */
 
 /**
  * @typedef {Object} Application
@@ -14,9 +32,12 @@
  * @property {function(Object): void} initMainFrame - Инициализировать основную форму приложения 
  * @property {function(string): Object} findByName - Найти компонент по имени
  * @property {function(function): Promise} startAsync - Функция для выполнения асинхронной операции
+ * @property {function(): string} getArguments - Список агрументов для запуска
+ * @property {function(): void} exit - Закрыть приложение
  * @property {ApplicationStorage} storage - Работа с хранилищем
+ * @property {ApplicationFile} file - Работа с файлами
+ * @property {ApplicationDirectory} directory - Работа с папками
  */
-
 
 /**
  * @typedef {Object} FrameConfig
@@ -26,7 +47,6 @@
  * @property {any} width - Ширина
  * @property {any} height - Высота
  * @property {Array} items - Массив элементов
- * @property {string} tag - Метка контрола
  * @property {function} run - Функция, что вызывается, когда фрейм инициализировался
  */
 class Frame {
@@ -50,7 +70,6 @@ class Frame {
  * @property {number} row - Строка внутри контейнера
  * @property {number} rowSpan - Количество занимаемях строк
  * @property {Array} items - Массив элементов
- * @property {string} tag - Метка контрола
  */
 class GridBagLayout {
     /**
@@ -73,7 +92,6 @@ class GridBagLayout {
  * @property {number} row - Строка внутри контейнера
  * @property {number} rowSpan - Количество занимаемях строк
  * @property {string} label - Текст в подсказке
- * @property {string} tag - Метка контрола
  */
 class Label {
     /**
@@ -98,7 +116,6 @@ class Label {
  * @property {string} value - Текст в подсказке
  * @property {string} placeholder - Текст как подсказка в пустом поле
  * @property {boolean} multiline - Поле многострочное
- * @property {string} tag - Метка контрола
  * @property {function} changed - Событие вызывается при изменении значения
  */
 class Text {
@@ -133,7 +150,6 @@ class Text {
  * @property {number} columnSpan - Количество занимаемях столбцов
  * @property {number} row - Строка внутри контейнера
  * @property {number} rowSpan - Количество занимаемях строк
- * @property {string} tag - Метка контрола
  * @property {number} selectedIndex - Номер выбранного элемента
  * @property {Array} items - Элементы, с ключами text и value
  * @property {function} changed - Событие вызывается при изменении значения
@@ -158,7 +174,6 @@ class CheckBox {
  * @property {number} columnSpan - Количество занимаемях столбцов
  * @property {number} row - Строка внутри контейнера
  * @property {number} rowSpan - Количество занимаемях строк
- * @property {string} tag - Метка контрола
  * @property {boolean} value - Текущее значение
  * @property {string} label - Подсказка
  * @property {function} changed - Событие вызывается при изменении значения
@@ -172,10 +187,9 @@ class ComboBox {
     }
 
     /**
-     * Получить подсказку
-     * @returns {undefined} Результат
+     * Установить список элементов. Это массив из text и value свойств
      */
-    getLabel () { }
+    setItems (items) { }
 
     /**
      * Установить подсказку
@@ -210,7 +224,6 @@ class ComboBox {
  * @property {number} rowSpan - Количество занимаемях строк
  * @property {string} label - Текст в подсказке
  * @property {function} click - Функция при клике
- * @property {string} tag - Метка контрола
  */
 class Button {
     /**
@@ -262,11 +275,10 @@ class GitRepository {
 
                 let branchName = branch.trim();
                 let isCurrent = branchName.startsWith('*');
-                branchName = branchName.trimStart('*');
 
                 list.push({
                     isCurrent: isCurrent,
-                    name: branchName,
+                    name: branchName.replace(new RegExp("^\\*+"), "").trim(),
                     isRemote: listBranch === listRemote
                 });
             }

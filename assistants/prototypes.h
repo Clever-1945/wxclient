@@ -35,8 +35,7 @@ namespace prototypes
         }
     }
 
-    namespace checkBox
-    {
+    namespace checkBox {
         /** Поулчить значение */
         JSValue get_value(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
             auto control = prototypes::text::getInstance<wxCheckBox>(ctx, this_val);
@@ -164,6 +163,12 @@ namespace prototypes
             }
 
             return assistant::js::getUndefined();
+        }
+
+        void registration (JSContext *ctx) {
+            assistant::js::registerPrototype(ctx, "ComboBox", "setItems", prototypes::comboBox::set_items);
+            assistant::js::registerPrototype(ctx, "ComboBox", "getSelectedValue", prototypes::comboBox::get_selected_value);
+            assistant::js::registerPrototype(ctx, "ComboBox", "setSelectedValue", prototypes::comboBox::set_selected_value);
         }
     }
 }
