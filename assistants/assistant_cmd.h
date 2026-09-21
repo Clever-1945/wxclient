@@ -115,7 +115,7 @@ namespace assistant
                 }
             }
 
-            std::thread worker([&runner, resolve_func, ctx, receiveOutput, command]() {
+            std::thread worker([runner, resolve_func, ctx, receiveOutput, command]() {
                 runner(command, [ctx, receiveOutput](std::string line){
                     wxTheApp->CallAfter([ctx, receiveOutput, line_copy = line]() {
                         if (!JS_IsUndefined(receiveOutput)) {

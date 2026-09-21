@@ -31,6 +31,12 @@ namespace assistant
             wxMessageBox(wxString::FromUTF8(message), title.empty() ? wxT("Уведомление") : wxString::FromUTF8(title), wxOK | wxICON_ERROR);
         }
 
+        /** Диалоговое окно с вопросом Да НЕТ */
+        bool yesNo(std::string message, std::string title = "") {
+            int response = wxMessageBox(wxString::FromUTF8(message), title.empty() ? wxT("Уведомление") : wxString::FromUTF8(title), wxYES_NO | wxICON_QUESTION);
+            return response == wxYES;
+        }
+
         /** Из события получить информацию о контроле */
         std::optional<wxEventControlJsData> getEventControlJsData(wxEvent &event) {
             wxWindow *control = dynamic_cast<wxWindow *>(event.GetEventObject());

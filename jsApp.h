@@ -232,10 +232,8 @@ public:
         }
         js->setContextOpaque(this);
 
-        js->registerFn("app", "alert", assistant::app::alert);
-        js->registerFn("app", "error", assistant::app::error);
-        js->registerFn("app", "getArguments", assistant::app::getArguments);
-        js->registerFn("app", "exit", assistant::app::exit);
+        assistant::app::registration(js->getCtx());
+
         js->registerFn("app", "initMainFrame", js_init_main_frame);
         js->registerFn("app", "findByName", js_find_by_name);
         js->registerFn("app", "startAsync", js_start_async);

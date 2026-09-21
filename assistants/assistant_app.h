@@ -68,6 +68,17 @@ namespace assistant
             return assistant::js::getUndefined();
         }
 
+        /** Диалоговое окно с вопросом Да НЕТ */
+        JSValue yesNo(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
+            if (argc > 0) {
+                auto text = getMessageText(ctx, argv[0]);
+                std::optional<std::string> title = argc >= 2 ? assistant::js::to_string(ctx, argv[1]) : std::nullopt;
+                auto isYes = assistant::ui::yesNo(text.value_or(""), title.value_or(""));
+                return assistant::js::to_value(ctx, isYes);
+            }
+            return assistant::js::getUndefined();
+        }
+
         /** Список аргументов с которыми запущено приложение */
         JSValue getArguments(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
             int argumentCount = wxTheApp->argc;
@@ -85,6 +96,14 @@ namespace assistant
         JSValue exit(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
             wxTheApp->Exit();
             return assistant::js::getUndefined();
+        }
+
+        void registration (JSContext *ctx) {
+            assistant::js::registerFn(ctx, "app", "alert", assistant::app::alert);
+            assistant::js::registerFn(ctx, "app", "error", assistant::app::error);
+            assistant::js::registerFn(ctx, "app", "getArguments", assistant::app::getArguments);
+            assistant::js::registerFn(ctx, "app", "yesNo", assistant::app::yesNo);
+            assistant::js::registerFn(ctx, "app", "exit", assistant::app::exit);
         }
     }
 

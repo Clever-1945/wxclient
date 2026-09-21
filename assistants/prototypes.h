@@ -156,8 +156,10 @@ namespace prototypes
                     wxStringClientData *stringData = dynamic_cast<wxStringClientData *>(rawData);
                     if (stringData) {
                         std::string value_index = stringData->GetData().ToStdString();
-                        control->SetSelection(i);
-                        return assistant::js::getUndefined();
+                        if (value_index == value.value()) {
+                            control->SetSelection(i);
+                            return assistant::js::getUndefined();
+                        }
                     }
                 }
             }

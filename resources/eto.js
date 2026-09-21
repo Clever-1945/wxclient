@@ -29,6 +29,7 @@
 /**
  * @typedef {Object} Application
  * @property {function(string): void} alert - Выводит системное уведомление
+ * @property {function(string): boolean} yesNo - Задать вопрос ДА или НЕТ
  * @property {function(Object): void} initMainFrame - Инициализировать основную форму приложения 
  * @property {function(string): Object} findByName - Найти компонент по имени
  * @property {function(function): Promise} startAsync - Функция для выполнения асинхронной операции
