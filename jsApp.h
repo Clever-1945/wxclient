@@ -3,6 +3,7 @@
 #include <atomic>
 #include <thread>
 #include "Data/ObservableValue.h"
+#include "assistants/assistant_buss.h"
 #include "assistants/assistant_core.h"
 #include "assistants/assistant_js.h"
 #include "assistants/assistant_db.h"
@@ -27,11 +28,9 @@ private:
     {        
         auto app = QuickJsEngine::getContextOpaque<jsApp>(ctx);
         auto value = assistant::js::getValue(argc, argv, 0);
-        wxFrameData *data = nullptr;
         if (app && app->getJs()->getClassName(value) == "Frame")
         {
             render::frame::apply(app->mainFrame, ctx, value);
-            data = render::frame::getFrameData(app->mainFrame);
         }
 
         return assistant::js::getUndefined();
@@ -115,8 +114,8 @@ private:
         auto js_directory = assistant::path::combine(executablePath, "js");
         assistant::directory::create(js_directory);
 
-        auto eto_js = assistant::path::combine(js_directory, "eto.js");
-        auto main_js = assistant::path::combine(js_directory, "main.js");
+        auto eto_js = assistant::path::combine(js_directory, "eto.ts");
+        auto main_js = assistant::path::combine(js_directory, "main.ts");
 
         if (!assistant::file::exists(eto_js)) {
             auto content = assistant::core::getContentResource("ETO_SCRIPT");
@@ -148,22 +147,9 @@ private:
         assistant::git::registrationPrototypes(this->js->getCtx());
     }
 
-    void showAsyncMask(int countMask)
-    {
+    void showAsyncMask(int countMask) {
         this->counterAsync += countMask;
-        wxTheApp->CallAfter([this]() 
-        {
-            int counterAsync = this->counterAsync;
-            for (wxWindowList::compatibility_iterator node = wxTopLevelWindows.GetFirst(); node; node = node->GetNext())
-            {
-                wxFrame *frame = dynamic_cast<wxFrame*>(node->GetData());                
-                auto data = render::frame::getFrameData(frame);
-                if (data)
-                {
-                    data->showLoading(counterAsync);
-                }
-            }
-        });
+        assistant::buss::asyncCounter->set(this->counterAsync);
     }
 
     void refreshScript() {
@@ -185,20 +171,8 @@ private:
     }
 
     /** Запустить скрипт приложения */
-    void runMainJs()
-    {
-        this->js->evalFile("js\\main.js");
-        auto data = render::frame::getFrameData(this->mainFrame);
-        if (data)
-        {
-            data->setClickRefresh([this] 
-            {
-                jsApp *app = dynamic_cast<jsApp *>(wxTheApp);
-                if (app) {
-                    app->refreshScript();
-                }
-            });
-        }
+    void runMainJs() {
+        this->js->evalFile("js\\main.ts");
     }
 
     int FilterEvent(wxEvent& event) {
@@ -209,9 +183,9 @@ private:
                 return Event_Processed;
             }
             if (keyEvent.GetKeyCode() == WXK_F11) {
-                auto data = render::frame::getFrameData(this->mainFrame);
-                if (data) {
-                    data->changeShowDebugPanel();
+                auto sizer = dynamic_cast<wxFrameSizer *>(this->mainFrame->GetSizer());
+                if (sizer) {
+                    sizer->changeShowDebugPanel();
                     return Event_Processed;
                 }
             }
@@ -263,7 +237,14 @@ public:
         // Вызываем лямбду сразу после того, как frame полностью отобразится
         mainFrame->CallAfter([this]() 
         {
-            this->js->evalFile("js\\eto.js");
+            auto converterTypeScript = assistant::core::getContentResource("SUCRASE_SCRIPT");
+            assistant::js::evalScript(this->js->getCtx(), converterTypeScript, "sucrase.js");
+
+            auto initScript = assistant::core::getContentResource("ETO_SCRIPT");
+            initScript = assistant::js::convert_ts_to_js(this->js->getCtx(), initScript).value_or("");
+//
+            assistant::js::evalScript(this->js->getCtx(), "globalThis.exports = {};", "<init>");
+            assistant::js::evalScript(this->js->getCtx(), initScript, "<init>");
             this->registerPrototypes();
             this->runMainJs();
         });
@@ -271,16 +252,14 @@ public:
         return true;
     }
 
-    virtual int OnExit()
-    {
+    virtual int OnExit() {
         js->free();
         delete js;
         return 0;
     }
 
     /** Вернуть указатель на движок JS */
-    QuickJsEngine *getJs()
-    {
+    QuickJsEngine *getJs() {
         return this->js;
     }
 };

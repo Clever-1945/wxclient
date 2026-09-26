@@ -177,8 +177,7 @@ namespace assistant
         }
     }
 
-    namespace file
-    {
+    namespace file {
         JSValue exists(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv);
         JSValue write(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv);
         JSValue read(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv);

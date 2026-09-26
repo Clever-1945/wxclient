@@ -30,6 +30,8 @@ namespace assistant
         JSValue getUndefined();
         /** Завершить все фоновые микротаски */
         void pendingJob (JSContext *ctx);
+        /** Преобразовать TS контент в JS */
+        std::optional<std::string> convert_ts_to_js(JSContext *ctx, const std::string& ts_source_code);
 
         namespace pprivate
         {
@@ -315,14 +317,10 @@ namespace assistant
         }
 
         /** Выполнить скрипт из файла */
-        void evalFile(JSContext *ctx, std::string fileName) {
-            auto executableDirectory = assistant::directory::getDirectoryExecutable();
-            auto fullFileName = assistant::path::combine(executableDirectory, fileName);
-            std::string script = assistant::file::read(fullFileName);
+        void evalScript(JSContext *ctx, std::string script, std::string fileName) {
             if (script.empty()) {
                 return;
             }
-
             JSValue result = JS_Eval(ctx, script.c_str(), script.length(), fileName.c_str(), JS_EVAL_TYPE_GLOBAL);
             if (assistant::js::pprivate::processException(ctx, result)) {
                 JS_FreeValue(ctx, result);
@@ -330,6 +328,54 @@ namespace assistant
 
             JS_FreeValue(ctx, result);
             assistant::js::pendingJob(ctx);
+        }
+
+        /** Выполнить скрипт из файла */
+        void evalFile(JSContext *ctx, std::string fileName) {
+            auto executableDirectory = assistant::directory::getDirectoryExecutable();
+            auto fullFileName = assistant::path::combine(executableDirectory, fileName);
+            std::string script = assistant::file::read(fullFileName);
+            auto ts = assistant::js::convert_ts_to_js(ctx, script).value_or("");
+            evalScript(ctx, ts, fileName);
+        }
+
+        /** Преобразовать TS контент в JS */
+        std::optional<std::string> convert_ts_to_js(JSContext *ctx, const std::string& ts_source_code) {
+            JSValue global_obj = JS_GetGlobalObject(ctx);
+            JSValue transpile_fn = JS_GetPropertyStr(ctx, global_obj, "transpileTS");
+
+            if (!JS_IsFunction(ctx, transpile_fn)) {
+                JS_FreeValue(ctx, transpile_fn);
+                JS_FreeValue(ctx, global_obj);
+                JSException ex = {};
+                ex.error = "Ошибка: Функция transpileTS не найдена в контексте QuickJS";
+                ex.stack = std::string ();
+                exceptions->set(ex);
+                return std::nullopt;
+            }
+
+            JSValue arg_ts_code = JS_NewStringLen(ctx, ts_source_code.c_str(), ts_source_code.size());
+            JSValue js_result_value = JS_Call(ctx, transpile_fn, global_obj, 1, &arg_ts_code);
+            std::string pure_js_code = "";
+            if (!JS_IsException(js_result_value)) {
+                const char* c_str = JS_ToCString(ctx, js_result_value);
+                if (c_str) {
+                    pure_js_code = c_str;
+                    JS_FreeCString(ctx, c_str);
+                }
+            } else {
+                JSException ex = {};
+                ex.error = "Ошибка во время транспиляции внутри Sucrase";
+                ex.stack = std::string ();
+                exceptions->set(ex);
+            }
+
+            JS_FreeValue(ctx, arg_ts_code);
+            JS_FreeValue(ctx, js_result_value);
+            JS_FreeValue(ctx, transpile_fn);
+            JS_FreeValue(ctx, global_obj);
+
+            return pure_js_code;
         }
         
         /** Получить значение из массива */

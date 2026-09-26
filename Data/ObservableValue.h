@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <functional>
 #include <atomic>
+#include <mutex>
+#include <iostream>
 
 template<typename T>
 class ObservableValue {
@@ -10,9 +12,12 @@ private:
     inline static std::atomic<int64_t> counterListeners{0};
     std::map<int64_t, std::function<void()>> listeners;
     std::vector<T> values;
+    bool multiValue = false;
+    std::mutex mtx;
 
 public:
-    ObservableValue() {
+    ObservableValue(bool multiValue = true) {
+        this->multiValue = multiValue;
     }
 
     int64_t subscribe(std::function<void()> cb) {
@@ -27,7 +32,18 @@ public:
 
     /** Изменение значения и уведомление всех */
     void set(T value) {
-        this->values.push_back(value);
+        std::unique_lock<std::mutex> lock(mtx, std::try_to_lock);
+
+        if (this->multiValue) {
+            this->values.push_back(value);
+        } else {
+            if (this->values.size() < 1) {
+                this->values.push_back(value);
+            } else {
+                this->values[0] = value;
+            }
+        }
+
         for (const auto &[id, func]: listeners) {
             if (func) {
                 func();

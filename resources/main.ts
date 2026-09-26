@@ -1,6 +1,7 @@
-/** @typedef {import('./eto.js')} SourceTypes */
-/** @type {import('./eto.js').Application} */
-var app;
+import {Application, Button, Frame} from "./eto";
+
+var app: Application;
+
 
 app.initMainFrame(new Frame({
     title: 'Приложение',
@@ -11,11 +12,12 @@ app.initMainFrame(new Frame({
             row: 1,
             column: 1,
             width: '*',
-            text: 'text 3',
+            label: 'text 3',
             click: () => {
-                
+
             }
-        }),
+        })
     ]
 }));
+
 

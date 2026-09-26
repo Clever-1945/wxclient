@@ -1,3 +1,4 @@
 #include "wx/msw/wx.rc"
-ETO_SCRIPT TEXT "resources/eto.js"
-MAIN_SCRIPT TEXT "resources/main.js"
+ETO_SCRIPT TEXT "resources/eto.ts"
+MAIN_SCRIPT TEXT "resources/main.ts"
+SUCRASE_SCRIPT TEXT "sucrase-final.js"

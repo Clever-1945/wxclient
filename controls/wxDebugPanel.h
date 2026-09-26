@@ -14,7 +14,6 @@ private:
     wxButton *buttonError = nullptr;
     wxButton *buttonInfo = nullptr;
     wxButton *buttonWarning = nullptr;
-    wxButton *buttonRefresh = nullptr;
     int64_t idActionException = 0;
     int64_t idActionLog = 0;
     int64_t idActionWar = 0;
@@ -46,7 +45,6 @@ public:
         buttonError = new wxButton(this, wxID_ANY, "");
         buttonInfo = new wxButton(this, wxID_ANY, "");
         buttonWarning = new wxButton(this, wxID_ANY, "");
-        buttonRefresh = new wxButton(this, wxID_ANY, wxString::FromUTF8("Обновить"));
 
         wxBoxSizer *rowSizer = new wxBoxSizer(wxHORIZONTAL);
 
@@ -60,7 +58,6 @@ public:
 
         rowSizer->AddStretchSpacer(1);
 
-        rowSizer->Add(buttonRefresh, 0, wxALIGN_CENTER_VERTICAL | wxALL, 0);
         setCountError(0);
         setCountInfo(0);
         setCountWarning(0);
@@ -99,31 +96,11 @@ public:
         buttonError = nullptr;
         buttonInfo = nullptr;
         buttonWarning = nullptr;
-        buttonRefresh = nullptr;
         delete this->refreshFunction;
     }
 
     void showErrors() {
         auto frame = new wxErrorsFrame(wxTheApp->GetMainTopWindow());
         frame->Show();
-    }
-
-    /** Установить функцию, при обновлении приложения */
-    void setClickRefresh(const std::function<void()>& fn) {
-        if (buttonRefresh) {
-            this->refreshFunction = new std::function<void()>(fn);
-            buttonRefresh->Bind(wxEVT_BUTTON, [this](wxCommandEvent &event) {
-                if (this->refreshFunction) {
-                    (*refreshFunction)();
-                }
-            });
-        }
-    }
-
-    /** Обновить приложение */
-    void refresh() {
-        if (this->refreshFunction) {
-            (*refreshFunction)();
-        }
     }
 };

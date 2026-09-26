@@ -1,7 +1,8 @@
 #include <wx/wx.h>
 #include <wx/gbsizer.h>
 #include <wx/stattext.h>
-#include "Data/wxFrameData.h"
+#include "controls/wxFrameSizer.h"
+#include "Data/JsValue.h"
 
 extern "C"
 {
@@ -76,9 +77,15 @@ namespace render
             if (!control) {
                 return control;
             }
+            auto config = assistant::js::getValue(ctx, instance, "config");
+            if (!JS_IsObject(config))
+            {
+                JS_FreeValue(ctx, config);
+                return control;
+            }
 
-            auto widthInt = assistant::js::to_int(ctx, instance, "width");
-            auto heightInt = assistant::js::to_int(ctx, instance, "height");
+            auto widthInt = assistant::js::to_int(ctx, config, "width");
+            auto heightInt = assistant::js::to_int(ctx, config, "height");
             if (widthInt.has_value() || heightInt.has_value()) {
                 control->SetSize(
                         widthInt.value_or(control->GetSize().GetWidth()),
@@ -86,11 +93,11 @@ namespace render
                 );
             }
 
-            auto name = assistant::js::to_string(ctx, instance, "name");
+            auto name = assistant::js::to_string(ctx, config, "name");
             if (name.has_value()) {
                 control->SetName(wxString::FromUTF8(name.value()));
             }
-            auto id = assistant::js::to_int(ctx, instance, "id");
+            auto id = assistant::js::to_int(ctx, config, "id");
             if (id.has_value()) {
                 control->SetId(id.value());
             }
@@ -103,6 +110,7 @@ namespace render
             JSValue ptr_value = JS_NewInt64(ctx, address);
             JS_SetPropertyStr(ctx, instance, "__wx_ptr", ptr_value);
 
+            JS_FreeValue(ctx, config);
             return control;
         }
 
@@ -130,19 +138,25 @@ namespace render
         }
 
         void apply(wxCheckBox *control, JSContext *ctx, JSValue instance) {
-            auto label = assistant::js::to_string(ctx, instance, "label").value_or("");
+            auto config = assistant::js::getValue(ctx, instance, "config");
+            if (!JS_IsObject(config))
+            {
+                JS_FreeValue(ctx, config);
+                return;
+            }
+
+            auto label = assistant::js::to_string(ctx, config, "label").value_or("");
             control->SetLabel(wxString::FromUTF8(label));
 
-            auto value = assistant::js::to_bool(ctx, instance, "value").value_or(false);
+            auto value = assistant::js::to_bool(ctx, config, "value").value_or(false);
             control->SetValue(value);
             render::base::bindJsEvent(wxEVT_CHECKBOX, control, ctx, instance, "changed");
+            JS_FreeValue(ctx, config);
         }
     }
 
-    namespace comboBox
-    {
-        wxComboBox *create(wxWindow* parent)
-        {
+    namespace comboBox {
+        wxComboBox *create(wxWindow *parent) {
             return new wxComboBox(parent, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, 0, nullptr, wxCB_READONLY);
         }
 
@@ -161,73 +175,120 @@ namespace render
             if (!control) {
                 return;
             }
-            auto items = assistant::js::getValue(ctx, instance, "items");
+            auto config = assistant::js::getValue(ctx, instance, "config");
+            if (!JS_IsObject(config))
+            {
+                JS_FreeValue(ctx, config);
+                return;
+            }
+
+            auto items = assistant::js::getValue(ctx, config, "items");
             render::comboBox::setItems(control, ctx, items);
             JS_FreeValue(ctx, items);
 
-            auto selectedIndex = assistant::js::getValue(ctx, instance, "selectedIndex");
+            auto selectedIndex = assistant::js::getValue(ctx, config, "selectedIndex");
             render::comboBox::setSelectedIndex(control, ctx, selectedIndex);
             JS_FreeValue(ctx, selectedIndex);
 
             render::base::bindJsEvent(wxEVT_COMBOBOX, control, ctx, instance, "changed");
+            JS_FreeValue(ctx, config);
         }
     }
 
-    namespace label
-    {
-        wxStaticText *create(wxWindow *parent)
-        {
+    namespace label {
+        wxStaticText *create(wxWindow *parent) {
             return new wxStaticText(parent, wxID_ANY, "");
         }
 
-        void apply(wxStaticText *label, JSContext *ctx, JSValue instance)
-        {
-            auto labelText = assistant::js::to_string(ctx, instance, "label").value_or("");
+        void apply(wxStaticText *label, JSContext *ctx, JSValue instance) {
+            auto config = assistant::js::getValue(ctx, instance, "config");
+            if (!JS_IsObject(config))
+            {
+                JS_FreeValue(ctx, config);
+                return;
+            }
+
+            auto labelText = assistant::js::to_string(ctx, config, "label").value_or("");
             label->SetLabel(wxString::FromUTF8(labelText));
+            JS_FreeValue(ctx, config);
         }
     }
 
-    namespace text
-    {
+    namespace text {
         wxTextCtrl *create(wxWindow *parent, bool isMultiline = false) {
             return !isMultiline
                    ? new wxTextCtrl(parent, wxID_ANY, "")
-                   : new wxTextCtrl(parent, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxTE_MULTILINE | wxTE_WORDWRAP);
+                   : new wxTextCtrl(parent, wxID_ANY, "", wxDefaultPosition, wxDefaultSize,
+                                    wxTE_MULTILINE | wxTE_WORDWRAP);
         }
 
         void apply(wxTextCtrl *textControl, JSContext *ctx, JSValue instance) {
-            auto value = assistant::js::to_string(ctx, instance, "value").value_or("");
+            auto config = assistant::js::getValue(ctx, instance, "config");
+            if (!JS_IsObject(config))
+            {
+                JS_FreeValue(ctx, config);
+                return;
+            }
+
+            auto value = assistant::js::to_string(ctx, config, "value").value_or("");
             textControl->SetValue(wxString::FromUTF8(value));
 
-            auto placeholder = assistant::js::to_string(ctx, instance, "placeholder").value_or("");
+            auto placeholder = assistant::js::to_string(ctx, config, "placeholder").value_or("");
             if (!placeholder.empty()) {
                 textControl->SetValue(wxString::FromUTF8(placeholder));
             }
 
             render::base::bindJsEvent(wxEVT_TEXT, textControl, ctx, instance, "changed");
+            JS_FreeValue(ctx, config);
         }
     }
 
-    namespace button
-    {
+    namespace button {
         wxButton *create(wxWindow *parent) {
             return new wxButton(parent, wxID_ANY);
         }
 
         void apply(wxButton *button, JSContext *ctx, JSValue instance) {
-            auto label = assistant::js::to_string(ctx, instance, "label").value_or("");
+            auto config = assistant::js::getValue(ctx, instance, "config");
+            if (!JS_IsObject(config))
+            {
+                JS_FreeValue(ctx, config);
+                return;
+            }
+
+            auto label = assistant::js::to_string(ctx, config, "label").value_or("");
             button->SetLabel(wxString::FromUTF8(label));
             render::base::bindJsEvent(wxEVT_BUTTON, button, ctx, instance, "click");
+
+            JS_FreeValue(ctx, config);
         }
     }
 
     namespace gridBag
     {
-        wxGridBagSizer *create(int gap = 5) {
+        int defaultGup = 5;
+        void applyItems(wxGridBagSizer *grid, JSContext *ctx, JSValue items, wxWindow *parent);
+
+        wxGridBagSizer *create(int gap = gridBag::defaultGup) {
             return new wxGridBagSizer(gap, gap);
         }
 
-        void apply(wxGridBagSizer *grid, JSContext *ctx, JSValue items, wxWindow *parent)
+        void apply(wxGridBagSizer *grid, JSContext *ctx, JSValue instance, wxWindow *parent)
+        {
+            auto config = assistant::js::getValue(ctx, instance, "config");
+            if (!JS_IsObject(config))
+            {
+                JS_FreeValue(ctx, config);
+                return;
+            }
+
+            auto items = assistant::js::getValue(ctx, config, "items");
+            render::gridBag::applyItems(grid, ctx, items, parent);
+            JS_FreeValue(ctx, items);
+            JS_FreeValue(ctx, config);
+        }
+
+        void applyItems(wxGridBagSizer *grid, JSContext *ctx, JSValue items, wxWindow *parent)
         {
             if (!JS_IsArray(ctx, items) || !grid)
             {
@@ -239,17 +300,23 @@ namespace render
             {
                 JSValue item = JS_GetPropertyUint32(ctx, items, i);
                 auto className = assistant::js::getClassName(ctx, item);
+                auto config = assistant::js::getValue(ctx, item, "config");
+                if (!JS_IsObject(config))
+                {
+                    JS_FreeValue(ctx, config);
+                    continue;
+                }
 
                 wxWindow *control = nullptr;
                 wxSizer *sizer = nullptr;
 
-                auto row = assistant::js::to_int(ctx, item, "row").value_or(0);
-                auto rowSpan = assistant::js::to_int(ctx, item, "rowSpan").value_or(1);
-                auto column = assistant::js::to_int(ctx, item, "column").value_or(0);
-                auto columnSpan = assistant::js::to_int(ctx, item, "columnSpan").value_or(1);
+                auto row = assistant::js::to_int(ctx, config, "row").value_or(0);
+                auto rowSpan = assistant::js::to_int(ctx, config, "rowSpan").value_or(1);
+                auto column = assistant::js::to_int(ctx, config, "column").value_or(0);
+                auto columnSpan = assistant::js::to_int(ctx, config, "columnSpan").value_or(1);
 
-                auto widthString = assistant::js::to_string(ctx, item, "width");
-                auto heightString = assistant::js::to_string(ctx, item, "height");
+                auto widthString = assistant::js::to_string(ctx, config, "width");
+                auto heightString = assistant::js::to_string(ctx, config, "height");
 
                 if (className == "Button")
                 {
@@ -265,12 +332,11 @@ namespace render
                 }
                 if (className == "Text")
                 {
-                    auto multiline = assistant::js::to_bool(ctx, item, "multiline").value_or(false);
+                    auto multiline = assistant::js::to_bool(ctx, config, "multiline").value_or(false);
                     auto text = render::text::create(parent, multiline);
                     control = render::base::apply(text, ctx, item);
                     render::text::apply(text, ctx, item);
                 }
-                //checkBox
                 if (className == "CheckBox")
                 {
                     auto checkBox = render::checkBox::create(parent);
@@ -287,10 +353,7 @@ namespace render
                 {
                     auto gridBag = render::gridBag::create();
                     sizer = render::base::apply(gridBag, ctx, item);
-
-                    auto gridItems = assistant::js::getValue(ctx, item, "items");
-                    render::gridBag::apply(gridBag, ctx, gridItems, parent);
-                    JS_FreeValue(ctx, gridItems);
+                    render::gridBag::apply(gridBag, ctx, item, parent);
                 }
 
                 if (control)
@@ -305,6 +368,7 @@ namespace render
                 {
                     JS_FreeValue(ctx, item);
                 }
+                JS_FreeValue(ctx, config);
 
                 if (columnSpan == 1)
                 {
@@ -334,34 +398,12 @@ namespace render
 
     namespace frame
     {
-        wxFrameData *getFrameData(wxFrame *frame) {
-            if (!frame) {
-                return nullptr;
-            }
+        JsValue getTest(JSContext *ctx, JSValue value) {
+            return JsValue(ctx, value);
+        }
 
-            auto boxSizer = reinterpret_cast<wxBoxSizer *>(frame->GetSizer());
-            if (!boxSizer) {
-                return nullptr;
-            }
-
-            auto count = boxSizer->GetChildren().GetCount();
-            if (count < 1) {
-                return nullptr;
-            }
-
-            wxPanel *panel = nullptr;
-            auto items = boxSizer->GetChildren();
-            auto node = items.Item(0);
-            wxSizerItem *item = node ? node->GetData() : nullptr;
-            if (item && item->IsWindow()) {
-                panel = dynamic_cast<wxPanel *>(item->GetWindow());
-            }
-
-            if (!panel) {
-                return nullptr;
-            }
-            auto data = reinterpret_cast<wxFrameData *>(panel->GetClientObject());
-            return data;
+        int getTest(const JsValue& v) {
+            return 0;
         }
 
         void apply(wxFrame *frame, JSContext *ctx, JSValue instance)
@@ -370,20 +412,33 @@ namespace render
             {
                 return;
             }
-            auto title = assistant::js::to_string(ctx, instance, "title");
+
+            {
+                auto a = getTest(ctx, assistant::js::getValue(ctx, instance, "config"));
+                auto a1 = getTest(ctx, assistant::js::getValue(ctx, instance, "config"));
+                getTest(a);
+            }
+            auto config = assistant::js::getValue(ctx, instance, "config");
+            if (!JS_IsObject(config))
+            {
+                JS_FreeValue(ctx, config);
+                return;
+            }
+
+            auto title = assistant::js::to_string(ctx, config, "title");
             if (title.has_value())
             {
                 frame->SetTitle(wxString::FromUTF8(title.value()));
             }
 
-            auto name = assistant::js::to_string(ctx, instance, "name");
+            auto name = assistant::js::to_string(ctx, config, "name");
             if (name.has_value())
             {
                 frame->SetName(wxString::FromUTF8(name.value()));
             }
 
-            auto width = assistant::js::to_int(ctx, instance, "width");
-            auto height = assistant::js::to_int(ctx, instance, "height");
+            auto width = assistant::js::to_int(ctx, config, "width");
+            auto height = assistant::js::to_int(ctx, config, "height");
             if (width.has_value() || height.has_value())
             {
                 auto widthValue = width.value_or(frame->GetSize().GetWidth());
@@ -391,33 +446,14 @@ namespace render
                 frame->SetSize(widthValue, heightValue);
             }
 
-            wxPanel* panel = new wxPanel(frame, wxID_ANY);
-            auto frameData = new wxFrameData();
-            panel->SetClientObject(frameData);
-            
-            wxBoxSizer* frame_sizer = new wxBoxSizer(wxVERTICAL);
-            frame_sizer->Add(panel, 1, wxEXPAND, 0);
-            frame->SetSizer(frame_sizer);
+            auto sizer = new wxFrameSizer(frame, render::gridBag::defaultGup);
 
-            wxBoxSizer* panel_sizer = new wxBoxSizer(wxVERTICAL);
-            panel->SetSizer(panel_sizer);
-            wxGauge* progressBar = new wxGauge(panel, wxID_ANY, 100,  wxDefaultPosition, wxSize(-1, 3),  wxGA_HORIZONTAL | wxGA_SMOOTH);
-            panel_sizer->Add(progressBar, 0, wxEXPAND, 0);
-            panel_sizer->Detach(progressBar);
-
-            auto grid = render::gridBag::create();
-            auto items = assistant::js::getValue(ctx, instance, "items");
-            render::gridBag::apply(grid, ctx, items, panel);
+            auto items = assistant::js::getValue(ctx, config, "items");
+            render::gridBag::applyItems(sizer->getGridItems(), ctx, items, sizer->getPanel());
             JS_FreeValue(ctx, items);
-            panel_sizer->Add(grid, 1, wxEXPAND, 0);
-            auto debugPanel = new wxDebugPanel(panel, wxID_ANY);
-            panel_sizer->Add(debugPanel, 0, wxEXPAND, 0);
 
-            frameData->setProgressBar(progressBar);
-            frameData->setPanelSizer(panel_sizer);
-            frameData->setPanel(panel);
-            frameData->setDebugPanel(debugPanel);
             frame->Layout();
+            JS_FreeValue(ctx, config);
         }
     }
 }
