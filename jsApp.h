@@ -52,28 +52,66 @@ private:
     {
         JSValue resolving_funcs[2];
         JSValue promise = JS_NewPromiseCapability(ctx, resolving_funcs);
-        auto app = QuickJsEngine::getContextOpaque<jsApp>(ctx);
 
         auto function = GET_VALUE(0);
         if (!function->is_function())
         {
             assistant::js::call(ctx, resolving_funcs[0], assistant::js::getUndefined(), assistant::js::getUndefined());
+
+            JS_FreeValue(ctx, resolving_funcs[0]);
+            JS_FreeValue(ctx, resolving_funcs[1]);
+
             return promise;
         }
 
-        auto value_promise = assistant::js::call(ctx, function->getRawValue(), assistant::js::getUndefined(), nullptr, 0);
-        if (value_promise->is_promise())
-        {
-            auto finally_fn = value_promise->getValue("finally");
-            if (finally_fn->is_function())
-            {
-                app->showAsyncMask(1);
-                JSValue finally_cb = JS_NewCFunctionData(ctx, on_finally_callback, 0, 0, 0, nullptr);
-                auto finally_ret = assistant::js::call(ctx, finally_fn->getRawValue(), value_promise->getRawValue(), &finally_cb, 1);
+        ctx = JS_DupContext(ctx);
+        auto functionValue = function->getRawDupValue();
+        std::thread worker([ctx, functionValue]() {
+            auto value_promise = assistant::js::call(ctx, functionValue, assistant::js::getUndefined(), nullptr, 0);
+            if (value_promise->is_promise()) {
+                auto finally_fn = value_promise->getValue("finally");
+                if (finally_fn->is_function()) {
+                    auto finally_fn_value = finally_fn->getRawDupValue();
 
-                JS_FreeValue(ctx, finally_cb);
+                    auto value_promise_clone = value_promise->getRawDupValue();
+                    wxTheApp->CallAfter([ctx, functionValue, finally_fn_value, value_promise_clone]() {
+                        auto app = dynamic_cast<jsApp*>(wxTheApp);
+                        app->showAsyncMask(1);
+
+                        JSValue finally_cb = JS_NewCFunctionData(ctx, on_finally_callback, 0, 0, 0, nullptr);
+                        auto finally_ret = assistant::js::call(ctx, finally_fn_value, value_promise_clone, &finally_cb, 1);
+                        JS_FreeValue(ctx, finally_cb);
+
+                        JS_FreeValue(ctx, value_promise_clone);
+                        JS_FreeValue(ctx, finally_fn_value);
+                        JS_FreeValue(ctx, functionValue);
+                        JS_FreeContext(ctx);
+                    });
+                } else {
+                    JS_FreeValue(ctx, functionValue);
+                    JS_FreeContext(ctx);
+                }
+            } else {
+                JS_FreeValue(ctx, functionValue);
+                JS_FreeContext(ctx);
             }
-        }
+        });
+
+        worker.detach();
+
+//        auto value_promise = assistant::js::call(ctx, function->getRawValue(), assistant::js::getUndefined(), nullptr, 0);
+//        if (value_promise->is_promise())
+//        {
+//            auto finally_fn = value_promise->getValue("finally");
+//            if (finally_fn->is_function())
+//            {
+//                app->showAsyncMask(1);
+//                JSValue finally_cb = JS_NewCFunctionData(ctx, on_finally_callback, 0, 0, 0, nullptr);
+//                auto finally_ret = assistant::js::call(ctx, finally_fn->getRawValue(), value_promise->getRawValue(), &finally_cb, 1);
+//
+//                JS_FreeValue(ctx, finally_cb);
+//            }
+//        }
 
         JS_FreeValue(ctx, resolving_funcs[0]);
         JS_FreeValue(ctx, resolving_funcs[1]);

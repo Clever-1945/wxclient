@@ -15,7 +15,21 @@ export interface Application {
     /** Закрыть приложение */
     exit: () => void;
     /** Функция для выполнения асинхронной операции */
-    startAsync: (fn: () => Promise<any>) => Promise<any>
+    startAsync: (fn: () => Promise<any>) => Promise<any>;
+    /** Объект работы с логированием данных */
+    console: {
+        /** логирование данных */
+        log: (text: any) => void;
+        /** логирование данных, но в раздел предупреждений */
+        war: (text: any) => void;
+        /** логирование данных, ошибку */
+        error: (text: any) => void;
+    },
+    /** Работа с командной строкой */
+    cmd: {
+        /** Запуск команды в команной строке */
+        run: (command: string, receiveOutput: (line: string) => void) => void;
+    },
     /** Объект работы с хранилищем */
     storage: {
         /** Добавить объект в хранилизе. Первый параметр имя коллекции, второй объект */
@@ -55,7 +69,7 @@ export interface Application {
         /** Папка из которой запущено приложение */
         getDirectoryExecutable: () => string;
         /** Список файлов в папке */
-        getListFile: () => string[];
+        getListFile: (directoryName: string, mask?: string) => string[];
     }
 }
 
@@ -111,7 +125,7 @@ export interface ILabel extends IControl {
 
 /** Описание статического текста на форме */
 export class Label{
-    constructor(public config: IGridBagLayout) {
+    constructor(public config: ILabel) {
     }
 }
 

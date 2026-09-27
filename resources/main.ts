@@ -1,6 +1,6 @@
 import {Application, Button, Frame} from "./eto";
 
-var app: Application;
+var app: Application = app!;
 
 
 app.initMainFrame(new Frame({

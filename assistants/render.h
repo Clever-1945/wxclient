@@ -51,7 +51,7 @@ namespace render
             sizer->SetClientObject(clientData);
 
             // Устанавливаем адрес ссылки в объект, в служебное поле
-            int64_t address = reinterpret_cast<int64_t>(sizer);
+            auto address = reinterpret_cast<int64_t>(sizer);
             JSValue ptr_value = JS_NewInt64(ctx, address);
             JS_SetPropertyStr(ctx, dupInstance, "__wx_ptr", ptr_value);
 
@@ -68,7 +68,7 @@ namespace render
             }
 
             wxClientData *clientDataVoid = control->GetClientObject();
-            JSValueClientData *clientData = dynamic_cast<JSValueClientData *>(clientDataVoid);
+            auto clientData = dynamic_cast<JSValueClientData *>(clientDataVoid);
             if (!clientData) {
                 return std::make_unique<JsValue>(nullptr, JS_UNDEFINED);
             }
@@ -106,7 +106,7 @@ namespace render
             control->SetClientObject(clientData);
 
             // Устанавливаем адрес ссылки в объект, в служебное поле
-            int64_t address = reinterpret_cast<int64_t>(control);
+            auto address = reinterpret_cast<int64_t>(control);
             JSValue ptr_value = JS_NewInt64(ctx, address);
             JS_SetPropertyStr(ctx, dupInstance, "__wx_ptr", ptr_value);
 
@@ -166,7 +166,6 @@ namespace render
                 return;
             }
             auto config = instance->getConfigValue();
-
             auto items = config->getValue("items");
             render::comboBox::setItems(control, items.get());
 
@@ -194,8 +193,7 @@ namespace render
         wxTextCtrl *create(wxWindow *parent, bool isMultiline = false) {
             return !isMultiline
                    ? new wxTextCtrl(parent, wxID_ANY, "")
-                   : new wxTextCtrl(parent, wxID_ANY, "", wxDefaultPosition, wxDefaultSize,
-                                    wxTE_MULTILINE | wxTE_WORDWRAP);
+                   : new wxTextCtrl(parent, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxTE_MULTILINE | wxTE_WORDWRAP);
         }
 
         void apply(wxTextCtrl *textControl, JSContext *ctx, JsValue* instance) {

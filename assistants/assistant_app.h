@@ -114,6 +114,17 @@ namespace assistant
 
             return assistant::js::getUndefined();
         }
+
+        JSValue error(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
+            auto error = assistant::app::getMessageText(GET_VALUE(0).get());
+            auto stack = assistant::app::getMessageText(GET_VALUE(1).get());
+            JSException ex {};
+            ex.error = error.value_or("");
+            ex.stack = stack.value_or("");
+            assistant::js::exceptions->set(ex);
+
+            return assistant::js::getUndefined();
+        }
     }
 
     namespace directory {
