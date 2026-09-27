@@ -1,5 +1,6 @@
 #pragma once
 #include <wx/clntdata.h>
+#include "JsValue.h"
 
 extern "C"
 {
@@ -13,6 +14,9 @@ private:
 
 public:
     JSValueClientData(JSContext *ctx, JSValue val) {
+        if (JS_IsUndefined(val)) {
+            return;
+        }
         this->val = val;
         this->ctx = ctx;
     }
@@ -22,6 +26,10 @@ public:
             JS_FreeValue(ctx, val);
         }
         ctx = nullptr;
+    }
+
+    std::unique_ptr<JsValue> getJsValue(bool disableFree = false) {
+        return std::make_unique<JsValue>(this->ctx, this->val, disableFree);
     }
 
     JSValue getValue() {

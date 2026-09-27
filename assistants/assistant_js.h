@@ -5,6 +5,7 @@
 #include "Data/ObservableValue.h"
 #include "Data/JSException.h"
 #include "Data/JsVariant.h"
+#include "Data/JsValue.h"
 
 extern "C"
 {
@@ -15,18 +16,13 @@ namespace assistant
 {
     namespace js
     {
-        std::optional<std::string> to_string(JSContext *ctx, JSValue value);
-        std::optional<std::string> to_string(JSContext *ctx, JSValue value, std::string propertyName);
-        std::optional<int> to_int(JSContext *ctx, JSValue value);
-        std::optional<int64_t> to_int_64(JSContext *ctx, JSValue value);
-        std::optional<bool> to_bool(JSContext *ctx, JSValue value);
         ObservableValue<JSException>* exceptions = new ObservableValue<JSException>();
         ObservableValue<std::string>* logs = new ObservableValue<std::string>();
         ObservableValue<std::string>* warning = new ObservableValue<std::string>();
-        JsVariant to_variant(JSContext *ctx, JSValue value);
+        JsVariant to_variant(JsValue* value);
         /** Выполнить функцию в скрипте */
-        JSValue call(JSContext *ctx, JSValueConst func_obj, JSValueConst this_obj, JSValueConst *argv, int argc);
-        JSValue call(JSContext *ctx, JSValueConst func_obj, JSValueConst this_obj, JSValue parameter);
+        std::unique_ptr<JsValue> call(JSContext *ctx, JSValueConst func_obj, JSValueConst this_obj, JSValueConst *argv, int argc);
+        std::unique_ptr<JsValue> call(JSContext *ctx, JSValueConst func_obj, JSValueConst this_obj, JSValue parameter);
         JSValue getUndefined();
         /** Завершить все фоновые микротаски */
         void pendingJob (JSContext *ctx);
@@ -37,20 +33,13 @@ namespace assistant
         {
             bool processException(JSContext *ctx, JSValue result) {
                 if (JS_IsException(result)) {
-                    JSValue exception_message = JS_GetException(ctx);
-                    JSValue exception_stack = JS_GetPropertyStr(ctx, exception_message, "stack");
-
-                    auto message = assistant::js::to_string(ctx, exception_message, "message");
-                    auto stack = assistant::js::to_string(ctx, exception_message, "stack");
-
-                    JS_FreeValue(ctx, exception_message);
-                    JS_FreeValue(ctx, exception_stack);
-                    JS_FreeValue(ctx, result);
-
-                    if (message.has_value()) {
+                    auto exceptionValue = JsValue::fromValue(ctx, JS_GetException(ctx));
+                    auto message = exceptionValue->getValue("message")->to_string().value_or("");
+                    auto stack = exceptionValue->getValue("stack")->to_string().value_or("");
+                    if (!message.empty()) {
                         JSException ex{};
-                        ex.error = message.value();
-                        ex.stack = stack.value_or("");
+                        ex.error = message;
+                        ex.stack = stack;
                         assistant::js::exceptions->set(ex);
                     }
 
@@ -97,7 +86,7 @@ namespace assistant
 
                 std::vector<JsVariant> args;
                 for (int i = 0; i < argc; i++) {
-                    args.push_back(assistant::js::to_variant(ctx, argv[i]));
+                    args.push_back(assistant::js::to_variant(GET_VALUE(i).get()));
                 }
 
                 std::thread worker([reject_func, resolve_func, args, func, ctx, this_val]() {
@@ -114,11 +103,10 @@ namespace assistant
 
                     wxTheApp->CallAfter([resolve_func, reject_func, result, ctx, isSucess]() {
                         auto js_result = result.to_js_value(ctx);
-                        JSValue ret = isSucess
-                                      ? assistant::js::call(ctx, resolve_func, assistant::js::getUndefined(), js_result)
-                                      : assistant::js::call(ctx, reject_func, assistant::js::getUndefined(), js_result);
+                        isSucess
+                            ? assistant::js::call(ctx, resolve_func, assistant::js::getUndefined(), js_result)
+                            : assistant::js::call(ctx, reject_func, assistant::js::getUndefined(), js_result);
                         JS_FreeValue(ctx, js_result);
-                        JS_FreeValue(ctx, ret);
                         JS_FreeValue(ctx, resolve_func);
                         JS_FreeValue(ctx, reject_func);
 
@@ -181,7 +169,7 @@ namespace assistant
         }
 
         /** Преобразовать JSON строку в JS значение */
-        JSValue to_value_from_json(JSContext *ctx, std::string json) {
+        JSValue to_value_from_json(JSContext *ctx, const std::string& json) {
             JSValue global_obj = JS_GetGlobalObject(ctx);
             JSValue json_obj = JS_GetPropertyStr(ctx, global_obj, "JSON");
             JSValue parse_fn = JS_GetPropertyStr(ctx, json_obj, "parse");
@@ -196,101 +184,55 @@ namespace assistant
             return result;
         }
 
-        /** Преобразовать JS объект в JSON строку */
-        std::optional<std::string> to_json(JSContext *ctx, JSValue value) {
-            JSValue global_obj = JS_GetGlobalObject(ctx);
-            JSValue json_obj = JS_GetPropertyStr(ctx, global_obj, "JSON");
-            JSValue stringify_fn = JS_GetPropertyStr(ctx, json_obj, "stringify");
-
-            JSValue argv[3];
-            argv[0] = value;
-            argv[1] = JS_NULL;
-            argv[2] = JS_NewInt32(ctx, 4);
-
-            JSValue json_js_string = JS_Call(ctx, stringify_fn, json_obj, 3, argv);
-            auto text_json = to_string(ctx, json_js_string);
-
-            JS_FreeValue(ctx, argv[2]);
-            JS_FreeValue(ctx, global_obj);
-            JS_FreeValue(ctx, json_obj);
-            JS_FreeValue(ctx, stringify_fn);
-            JS_FreeValue(ctx, json_js_string);
-
-            return text_json;
-        }
-
-        /** Факт того, что значение является промисом */
-        bool is_promise(JSContext *ctx, JSValue value) {
-            if (!JS_IsObject(value)) {
-                return false;
-            }
-
-            JSValue global_obj = JS_GetGlobalObject(ctx);
-            JSValue promise_ctor = JS_GetPropertyStr(ctx, global_obj, "Promise");
-            JS_FreeValue(ctx, global_obj);
-
-            int res = JS_IsInstanceOf(ctx, value, promise_ctor);
-
-            JS_FreeValue(ctx, promise_ctor);
-            return res > 0;
-        }
-
-        JsVariant to_variant(JSContext *ctx, JSValue value) {
-            if (JS_IsUndefined(value) || JS_IsNull(value)) {
+        JsVariant to_variant(JsValue* value) {
+            if (value->isUndefined() || value->isNull()) {
                 return JsVariant(std::monostate{});
             }
-            if (JS_IsBool(value)) {
-                return JsVariant(assistant::js::to_bool(ctx, value).value_or(false));
+            if (JS_IsBool(value->getRawValue())) {
+                return JsVariant(value->to_bool().value_or(false));
             }
-            if (JS_IsNumber(value)) {
-                if (JS_VALUE_GET_TAG(value) == JS_TAG_INT) {
-                    auto int_64 = assistant::js::to_int_64(ctx, value);
+            if (JS_IsNumber(value->getRawValue())) {
+                auto int_64 = value->to_int_64();
+                if (int_64.has_value()) {
                     return JsVariant(int_64.value_or(0));
                 }
 
-                double v = 0.0;
-                JS_ToFloat64(ctx, &v, value);
-                return JsVariant(v);
+                return JsVariant(value->to_double().value_or(0));
             }
 
-            if (JS_IsString(value)) {
-                auto str = assistant::js::to_string(ctx, value);
-                return JsVariant(str.value_or(""));
+            if (JS_IsString(value->getRawValue())) {
+                return JsVariant(value->to_string().value_or(""));
             }
-            if (JS_IsArray(ctx, value)) {
+            if (value->isArray()) {
                 JsArray arr;
-                JSValue len_val = JS_GetPropertyStr(ctx, value, "length");
-                int32_t len = 0;
-                JS_ToInt32(ctx, &len, len_val);
-                JS_FreeValue(ctx, len_val);
-
+                int len = value->getLength().value_or(0);
                 arr.reserve(len);
-                for (int32_t i = 0; i < len; i++) {
-                    JSValue elem = JS_GetPropertyUint32(ctx, value, i);
-                    arr.push_back(to_variant(ctx, elem));
-                    JS_FreeValue(ctx, elem);
+
+                for (int i = 0; i < len; i++) {
+                    arr.push_back(to_variant(value->at(i).get()));
                 }
                 return JsVariant(arr);
             }
-            if (JS_IsObject(value)) {
+            if (value->isObject()) {
                 JsObject obj;
                 JSPropertyEnum *ptab = nullptr;
                 uint32_t plen = 0;
 
-                if (JS_GetOwnPropertyNames(ctx, &ptab, &plen, value, JS_GPN_STRING_MASK | JS_GPN_SYMBOL_MASK) >= 0) {
+                if (JS_GetOwnPropertyNames(value->getContext(), &ptab, &plen, value->getRawValue(), JS_GPN_STRING_MASK | JS_GPN_SYMBOL_MASK) >= 0) {
                     for (uint32_t i = 0; i < plen; i++) {
-                        const char *key = JS_AtomToCString(ctx, ptab[i].atom);
-                        JSValue prop_val = JS_GetProperty(ctx, value, ptab[i].atom);
+                        const char *key = JS_AtomToCString(value->getContext(), ptab[i].atom);
+                        JSValue prop_val = JS_GetProperty(value->getContext(), value->getRawValue(), ptab[i].atom);
+                        auto prop_value = std::make_unique<JsValue>(value->getContext(), prop_val, true);
 
                         if (key) {
-                            obj[std::string(key)] = to_variant(ctx, prop_val);
-                            JS_FreeCString(ctx, key);
+                            obj[std::string(key)] = to_variant(prop_value.get());
+                            JS_FreeCString(value->getContext(), key);
                         }
 
-                        JS_FreeValue(ctx, prop_val);
-                        JS_FreeAtom(ctx, ptab[i].atom);
+                        JS_FreeValue(value->getContext(), prop_val);
+                        JS_FreeAtom(value->getContext(), ptab[i].atom);
                     }
-                    js_free(ctx, ptab);
+                    js_free(value->getContext(), ptab);
                 }
                 return JsVariant(obj);
             }
@@ -298,40 +240,33 @@ namespace assistant
             return JsVariant(std::monostate{});
         }
 
-        JSValue to_js_value(JSContext *ctx, const JsVariant &var) {
-            return var.to_js_value(ctx);
-        }
-
         /** Выполнить функцию в скрипте */
-        JSValue call(JSContext *ctx, JSValueConst func_obj, JSValueConst this_obj, JSValueConst *argv, int argc) {
+        std::unique_ptr<JsValue> call(JSContext *ctx, JSValueConst func_obj, JSValueConst this_obj, JSValueConst *argv, int argc) {
             JSValue result = JS_Call(ctx, func_obj, this_obj, argc, argv);
             assistant::js::pprivate::processException(ctx, result);
             assistant::js::pendingJob(ctx);
-            return result;
+            return std::make_unique<JsValue>(ctx, result);
         }
 
         /** Выполнить функцию в скрипте */
-        JSValue call(JSContext *ctx, JSValueConst func_obj, JSValueConst this_obj, JSValue parameter) {
+        std::unique_ptr<JsValue> call(JSContext *ctx, JSValueConst func_obj, JSValueConst this_obj, JSValue parameter) {
             JSValue argv[1] = {parameter};
             return call(ctx, func_obj, this_obj, argv, 1);
         }
 
         /** Выполнить скрипт из файла */
-        void evalScript(JSContext *ctx, std::string script, std::string fileName) {
+        void evalScript(JSContext *ctx, const std::string& script, const std::string& fileName) {
             if (script.empty()) {
                 return;
             }
             JSValue result = JS_Eval(ctx, script.c_str(), script.length(), fileName.c_str(), JS_EVAL_TYPE_GLOBAL);
-            if (assistant::js::pprivate::processException(ctx, result)) {
-                JS_FreeValue(ctx, result);
-            }
-
+            assistant::js::pprivate::processException(ctx, result);
             JS_FreeValue(ctx, result);
             assistant::js::pendingJob(ctx);
         }
 
         /** Выполнить скрипт из файла */
-        void evalFile(JSContext *ctx, std::string fileName) {
+        void evalFile(JSContext *ctx, const std::string& fileName) {
             auto executableDirectory = assistant::directory::getDirectoryExecutable();
             auto fullFileName = assistant::path::combine(executableDirectory, fileName);
             std::string script = assistant::file::read(fullFileName);
@@ -377,183 +312,19 @@ namespace assistant
 
             return pure_js_code;
         }
-        
-        /** Получить значение из массива */
-        JSValue getValue(int argc, JSValueConst *argv, int index) {
-            if (index < 0) {
-                return assistant::js::getUndefined();
-            }
-            if (index >= argc) {
-                return assistant::js::getUndefined();
-            }
 
-            return argv[index];
+        /** Получить значение по ключу в объекте */
+        std::unique_ptr<JsValue> getJsValue(JSContext *ctx, JSValue value, const std::string& propertyName, bool disableFree = false) {
+            return std::make_unique<JsValue>(ctx, value, propertyName, disableFree);
         }
 
         /** Получить значение по ключу в объекте */
         JSValue getValue(JSContext *ctx, JSValue value, std::string propertyName) {
             return JS_GetPropertyStr(ctx, value, propertyName.c_str());
         }
-        
-        /** Получить строку */
-        std::optional<std::string> to_string(JSContext *ctx, JSValue value) {
-            if (JS_IsString(value)) {
-                const char *text = JS_ToCString(ctx, value);
-                auto str = std::string(text);
-                JS_FreeCString(ctx, text);
-                return str;
-            }
-
-            return std::nullopt;
-        }
-
-        /** Получить строку */
-        std::optional<std::string> to_string(JSContext *ctx, JSValue value, std::string propertyName) {
-            auto propertyValue = assistant::js::getValue(ctx, value, propertyName);
-            auto returnValue = to_string(ctx, propertyValue);
-
-            JS_FreeValue(ctx, propertyValue);
-            return returnValue;
-        }
-
-        /** Вернуть функцию */
-        std::optional<JSValue> to_function(JSContext *ctx, JSValue value) {
-            if (JS_IsFunction(ctx, value)) {
-                return value;
-            }
-
-            return std::nullopt;
-        }
-
-        /** Вернуть функцию */
-        std::optional<JSValue> to_function(JSContext *ctx, JSValue value, std::string propertyName) {
-            auto fn = assistant::js::getValue(ctx, value, propertyName);
-            if (JS_IsFunction(ctx, fn)) {
-                return fn;
-            }
-
-            JS_FreeValue(ctx, fn);
-            return std::nullopt;
-        }
-
-        /** Получить целочисленное значение */
-        std::optional<int> to_int(JSContext *ctx, JSValue value) {
-            if (JS_IsUndefined(value)) {
-                return std::nullopt;
-            }
-
-            int result = 0;
-            int error = JS_ToInt32(ctx, &result, value);
-
-            if (error < 0) {
-                return std::nullopt;
-            }
-
-            return result;
-        }
-
-        /** Получить целочисленное значение */
-        std::optional<int> to_int(JSContext *ctx, JSValue value, std::string propertyName) {
-            auto propertyValue = assistant::js::getValue(ctx, value, propertyName);
-            auto returnValue = to_int(ctx, propertyValue);
-
-            JS_FreeValue(ctx, propertyValue);
-            return returnValue;
-        }
-
-        /** Получить целочисленное значение */
-        std::optional<int64_t> to_int_64(JSContext *ctx, JSValue value) {
-            int64_t result = 0;
-            int error = JS_ToInt64(ctx, &result, value);
-            if (JS_IsUndefined(value)) {
-                return std::nullopt;
-            }
-
-            if (error < 0) {
-                return std::nullopt;
-            }
-
-            return result;
-        }
-
-        /** Получить целочисленное значение */
-        std::optional<int64_t> to_int_64(JSContext *ctx, JSValue value, std::string propertyName) {
-            auto propertyValue = assistant::js::getValue(ctx, value, propertyName);
-            auto returnValue = to_int_64(ctx, propertyValue);
-
-            JS_FreeValue(ctx, propertyValue);
-            return returnValue;
-        }
-
-        /** Получить булевное значение */
-        std::optional<bool> to_bool(JSContext *ctx, JSValue value) {
-            if (JS_IsBool(value)) {
-                return JS_ToBool(ctx, value) != 0 ? true : false;
-            }
-            return std::nullopt;
-        }
-
-        /** Получить булевное значение */
-        std::optional<bool> to_bool(JSContext *ctx, JSValue value, std::string propertyName) {
-            auto propertyValue = assistant::js::getValue(ctx, value, propertyName);
-            auto returnValue = to_bool(ctx, propertyValue);
-
-            JS_FreeValue(ctx, propertyValue);
-            return returnValue;
-        }
-
-        /** Получить дробное число */
-        std::optional<double> to_double(JSContext *ctx, JSValue value) {
-            if (JS_IsUndefined(value)) {
-                return std::nullopt;
-            }
-
-            double result = 0;
-            int error = JS_ToFloat64(ctx, &result, value);
-            if (error < 0) {
-                return std::nullopt;
-            }
-
-            return result;
-        }
-
-        /** Получить дробное число */
-        std::optional<double> to_double(JSContext *ctx, JSValue value, std::string propertyName) {
-            auto propertyValue = assistant::js::getValue(ctx, value, propertyName);
-            auto returnValue = to_double(ctx, propertyValue);
-
-            JS_FreeValue(ctx, propertyValue);
-            return returnValue;
-        }
-
-        /** Получить имя класса */
-        std::string getClassName(JSContext *ctx, JSValue obj) {
-            std::string className;
-            if (!JS_IsObject(obj)) {
-                return className;
-            }
-
-            JSValue constructor = JS_GetPropertyStr(ctx, obj, "constructor");
-
-            if (!JS_IsException(constructor) && JS_IsObject(constructor)) {
-                JSValue name_val = JS_GetPropertyStr(ctx, constructor, "name");
-
-                if (!JS_IsException(name_val) && JS_IsString(name_val)) {
-                    const char *class_name = JS_ToCString(ctx, name_val);
-                    if (class_name) {
-                        className = std::string(class_name);
-                        JS_FreeCString(ctx, class_name);
-                    }
-                }
-                JS_FreeValue(ctx, name_val);
-            }
-
-            JS_FreeValue(ctx, constructor);
-            return className;
-        }
 
         /** Функция гарантирует получение или создание глобального объекта */
-        JSValue getOrCreateGlobalObject(JSContext *ctx, std::string name) {
+        JSValue getOrCreateGlobalObject(JSContext *ctx, const std::string& name) {
             auto segments = assistant::core::split(name, ".");
             JSValue currentObject = JS_GetGlobalObject(ctx);
             for (const auto &s: segments) {
@@ -571,7 +342,7 @@ namespace assistant
         }
 
         /** Получить указатель на портотип. Нужно удалить объект после использваония */
-        JSValue getPrototype(JSContext *ctx, std::string className) {
+        JSValue getPrototype(JSContext *ctx, const std::string& className) {
             JSValue global_obj = JS_GetGlobalObject(ctx);
             JSValue class_constructor = JS_GetPropertyStr(ctx, global_obj, className.c_str());
 
@@ -652,15 +423,11 @@ namespace assistant
         }
 
         /** Послать событие обратно в JS и передать в событии ссылку на компонент */
-        void emitEvent(wxEventControlJsData data, std::string eventName) {
+        void emitEvent(wxEventControlJsData data, const std::string& eventName) {
             auto context = data.clientData->getContext();
-            auto instance = data.clientData->getValue();
-            auto changed = assistant::js::to_function(context, instance, eventName);
-            if (changed.has_value()) {
-                auto changedFn = changed.value();
-                JSValue ret = assistant::js::call(context, changedFn, assistant::js::getUndefined(), instance);
-                JS_FreeValue(context, ret);
-                JS_FreeValue(context, changedFn);
+            auto eventFunction = data.clientData->getJsValue(true)->getConfigValue()->getValue(eventName);
+            if (eventFunction->is_function()) {
+                assistant::js::call(context, eventFunction->getRawValue(), assistant::js::getUndefined(), data.clientData->getValue());
             }
         }
     }

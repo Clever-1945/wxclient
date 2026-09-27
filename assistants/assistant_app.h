@@ -14,33 +14,31 @@ namespace assistant
 {
     namespace app {
         /** Получить текст для вывода сообщения */
-        std::optional<std::string> getMessageText(JSContext *ctx, JSValue value) {
-            if (JS_IsObject(value)) {
-                auto json = assistant::js::to_json(ctx, value);
-                return json;
+        std::optional<std::string> getMessageText(JsValue* value) {
+            if (value->isObject()) {
+                return value->to_json();
             }
 
-            if (JS_IsArray(ctx, value)) {
-                auto json = assistant::js::to_json(ctx, value);
-                return json;
+            if (value->isArray()) {
+                return value->to_json();
             }
 
-            auto text = assistant::js::to_string(ctx, value);
+            auto text = value->to_string();
             if (text.has_value()) {
                 return text.value();
             }
 
-            auto number_int = assistant::js::to_int_64(ctx, value);
+            auto number_int = value->to_int_64();
             if (number_int.has_value()) {
                 return std::to_string(number_int.value());
             }
 
-            auto boolean = assistant::js::to_bool(ctx, value);
+            auto boolean = value->to_bool();
             if (boolean.has_value()) {
                 return boolean.value() ? "True" : "False";
             }
 
-            auto number_double = assistant::js::to_double(ctx, value);
+            auto number_double = value->to_double();
             if (number_double.has_value()) {
                 return std::to_string(number_double.value());
             }
@@ -49,34 +47,27 @@ namespace assistant
         }
 
         JSValue alert(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
-            if (argc < 1) {
-                return assistant::js::getUndefined();
-            }
-            auto value = argv[0];
-            auto text = getMessageText(ctx, value);
+            auto value = GET_VALUE(0);
+            auto text = getMessageText(value.get());
             assistant::ui::alert(text.value_or(""));
             return assistant::js::getUndefined();
         }
 
         JSValue error(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
-            if (argc < 1) {
-                return assistant::js::getUndefined();
-            }
-            auto value = argv[0];
-            auto text = getMessageText(ctx, value);
+            auto value = GET_VALUE(0);
+            auto text = getMessageText(value.get());
             assistant::ui::error(text.value_or(""));
             return assistant::js::getUndefined();
         }
 
         /** Диалоговое окно с вопросом Да НЕТ */
         JSValue yesNo(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
-            if (argc > 0) {
-                auto text = getMessageText(ctx, argv[0]);
-                std::optional<std::string> title = argc >= 2 ? assistant::js::to_string(ctx, argv[1]) : std::nullopt;
-                auto isYes = assistant::ui::yesNo(text.value_or(""), title.value_or(""));
-                return assistant::js::to_value(ctx, isYes);
-            }
-            return assistant::js::getUndefined();
+            auto value_text = GET_VALUE(0);
+            auto value_title = GET_VALUE(1);
+            auto text = getMessageText(value_text.get());
+            auto title = value_title->to_string();
+            auto isYes = assistant::ui::yesNo(text.value_or(""), title.value_or(""));
+            return assistant::js::to_value(ctx, isYes);
         }
 
         /** Список аргументов с которыми запущено приложение */
@@ -109,19 +100,17 @@ namespace assistant
 
     namespace console {
         JSValue log(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
-            if (argc > 0) {
-                auto text = assistant::app::getMessageText(ctx, argv[0]);
-                assistant::js::logs->set(text.value_or(""));
-            }
+            auto value = GET_VALUE(0);
+            auto text = assistant::app::getMessageText(value.get());
+            assistant::js::logs->set(text.value_or(""));
 
             return assistant::js::getUndefined();
         }
 
         JSValue war(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
-            if (argc > 0) {
-                auto text = assistant::app::getMessageText(ctx, argv[0]);
-                assistant::js::warning->set(text.value_or(""));
-            }
+            auto value = GET_VALUE(0);
+            auto text = assistant::app::getMessageText(value.get());
+            assistant::js::warning->set(text.value_or(""));
 
             return assistant::js::getUndefined();
         }
@@ -141,20 +130,14 @@ namespace assistant
         }
 
         JSValue exists(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
-            if (argc < 1) {
-                return assistant::js::getUndefined();
-            }
-            auto directoryName = assistant::js::to_string(ctx, argv[0]);
+            auto directoryName = GET_VALUE(0)->to_string();
             return directoryName.has_value()
                    ? assistant::js::to_value(ctx, assistant::directory::exists(directoryName.value()))
                    : assistant::js::getUndefined();
         }
 
         JSValue create(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
-            if (argc < 1) {
-                return assistant::js::getUndefined();
-            }
-            auto directoryName = assistant::js::to_string(ctx, argv[0]);
+            auto directoryName = GET_VALUE(0)->to_string();
             return directoryName.has_value()
                    ? assistant::js::to_value(ctx, assistant::directory::create(directoryName.value()))
                    : assistant::js::getUndefined();
@@ -170,8 +153,8 @@ namespace assistant
             if (argc < 1) {
                 return assistant::js::getUndefined();
             }
-            auto directoryName = assistant::js::to_string(ctx, argv[0]);
-            auto mask = argc >= 2 ? assistant::js::to_string(ctx, argv[1]) : std::nullopt;
+            auto directoryName = GET_VALUE(0)->to_string();
+            auto mask = GET_VALUE(1)->to_string();
             auto list = getListFile(directoryName.value(), mask.value_or(""));
             return assistant::js::to_value(ctx, list);
         }
@@ -197,10 +180,7 @@ namespace assistant
         }
 
         JSValue directory(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
-            if (argc < 1) {
-                return assistant::js::getUndefined();
-            }
-            auto fileName = assistant::js::to_string(ctx, argv[0]);
+            auto fileName = GET_VALUE(0)->to_string();
             if (!fileName.has_value()) {
                 return assistant::js::getUndefined();
             }
@@ -208,40 +188,28 @@ namespace assistant
         }
 
         JSValue extension(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
-            if (argc < 1) {
-                return assistant::js::getUndefined();
-            }
-            auto fileName = assistant::js::to_string(ctx, argv[0]);
+            auto fileName = GET_VALUE(0)->to_string();
             return fileName.has_value()
                    ? assistant::js::to_value(ctx, assistant::file::extension(fileName.value()))
                    : assistant::js::getUndefined();
         }
 
         JSValue fileName(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
-            if (argc < 1) {
-                return assistant::js::getUndefined();
-            }
-            auto fileName = assistant::js::to_string(ctx, argv[0]);
+            auto fileName = GET_VALUE(0)->to_string();
             return fileName.has_value()
                    ? assistant::js::to_value(ctx, assistant::file::fileName(fileName.value()))
                    : assistant::js::getUndefined();
         }
 
         JSValue size(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
-            if (argc < 1) {
-                return assistant::js::getUndefined();
-            }
-            auto fileName = assistant::js::to_string(ctx, argv[0]);
+            auto fileName = GET_VALUE(0)->to_string();
             return fileName.has_value()
                    ? assistant::js::to_value(ctx, assistant::file::size(fileName.value()))
                    : assistant::js::getUndefined();
         }
 
         JSValue exists(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
-            if (argc < 1) {
-                return assistant::js::getUndefined();
-            }
-            auto fileName = assistant::js::to_string(ctx, argv[0]);
+            auto fileName = GET_VALUE(0)->to_string();
             return fileName.has_value()
                    ? assistant::js::to_value(ctx, assistant::file::exists(fileName.value()))
                    : assistant::js::getUndefined();
@@ -250,8 +218,8 @@ namespace assistant
         /** Записать контент в файл */
         JSValue write(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
             if (argc >= 2) {
-                auto fileName = assistant::js::to_string(ctx, argv[0]);
-                auto content = assistant::js::to_string(ctx, argv[1]);
+                auto fileName = GET_VALUE(0)->to_string();
+                auto content = GET_VALUE(1)->to_string();
                 if (fileName.has_value() && content.has_value()) {
                     assistant::file::write(fileName.value(), content.value());
                 }
@@ -261,12 +229,10 @@ namespace assistant
 
         /** Прочитать контент из файла */
         JSValue read(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
-            if (argc >= 1) {
-                auto fileName = assistant::js::to_string(ctx, argv[0]);
-                if (fileName.has_value() && assistant::file::exists(fileName.value())) {
-                    auto content = assistant::file::read(fileName.value());
-                    return assistant::js::to_value(ctx, content);
-                }
+            auto fileName = GET_VALUE(0)->to_string();
+            if (fileName.has_value() && assistant::file::exists(fileName.value())) {
+                auto content = assistant::file::read(fileName.value());
+                return assistant::js::to_value(ctx, content);
             }
             return assistant::js::getUndefined();
         }

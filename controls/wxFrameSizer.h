@@ -23,8 +23,8 @@ private:
     wxGridBagSizer* items_grid = nullptr;
     wxDebugPanel* debug_panel = nullptr;
     int64_t asyncCounterId = 0;
-    bool isVisibleProgressBar = false;
-    bool isVisibleDebugPanel = false;
+    bool isVisibleProgressBar = true;
+    bool isVisibleDebugPanel = true;
 
     void showLoading(bool isVisibleProgressBar) {
         if (this->isVisibleProgressBar == isVisibleProgressBar) {
@@ -83,21 +83,20 @@ public:
         this->frame_panel->SetSizer(this->panel_sizer);
 
         this->progressBar = new wxGauge(this->frame_panel, wxID_ANY, 100,  wxDefaultPosition, wxSize(-1, 3),  wxGA_HORIZONTAL | wxGA_SMOOTH);
-        this->panel_sizer->Add(progressBar, 0, wxEXPAND, 0);
-//        this->panel_sizer->Detach(this->progressBar);
+        this->panel_sizer->Add(this->progressBar, 0, wxEXPAND, 0);
 
         this->items_grid = new wxGridBagSizer(gap, gap);
         this->panel_sizer->Add(this->items_grid, 1, wxEXPAND, 0);
-        // this->panel_sizer->Add(new wxStaticText(this->frame_panel, wxID_ANY, ""), 1, wxEXPAND, 0);
 
         this->debug_panel = new wxDebugPanel(this->frame_panel, wxID_ANY);
         this->panel_sizer->Add(this->debug_panel, 0, wxEXPAND, 0);
-//        this->panel_sizer->Detach(this->debug_panel);
-//        this->asyncCounterId = assistant::buss::asyncCounter->subscribe([this] {
-//            this->showLoading(assistant::buss::asyncCounter->get(0) > 0);
-//        });
-//
-         this->frame_panel->Layout();
+        this->asyncCounterId = assistant::buss::asyncCounter->subscribe([this] {
+            this->showLoading(assistant::buss::asyncCounter->get(0) > 0);
+        });
+
+        this->frame_panel->Layout();
+        this->showDebugPanel(false);
+        this->showLoading(false);
     }
 
     ~wxFrameSizer() {

@@ -24,32 +24,25 @@ private:
     bool isRegisterPrototypes = false;
     inline static std::atomic<int> counterAsync{0};
 
-    static JSValue js_init_main_frame(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
-    {        
-        auto app = QuickJsEngine::getContextOpaque<jsApp>(ctx);
-        auto value = assistant::js::getValue(argc, argv, 0);
-        if (app && app->getJs()->getClassName(value) == "Frame")
-        {
-            render::frame::apply(app->mainFrame, ctx, value);
+    static JSValue js_init_main_frame(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
+        auto app = dynamic_cast<jsApp *>(wxTheApp);
+        auto value = GET_VALUE(0);
+        if (app && value->getClassName() == "Frame") {
+            render::frame::apply(app->mainFrame, ctx, value.get());
         }
 
         return assistant::js::getUndefined();
     }
 
-    static JSValue js_find_by_name(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv)
-    {
-        auto value = assistant::js::getValue(argc, argv, 0);
-        auto name = assistant::js::to_string(ctx, value);
-        wxWindow* control = wxWindow::FindWindowByName(wxString::FromUTF8(name.value().c_str()), nullptr);
-        auto className = assistant::js::getClassName(ctx, render::base::getValue(control));
-        return JS_DupValue(ctx, render::base::getValue(control));
+    static JSValue js_find_by_name(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
+        auto name = GET_VALUE(0)->to_string();
+        wxWindow *control = wxWindow::FindWindowByName(wxString::FromUTF8(name.value_or("").c_str()), nullptr);
+        return render::base::getValue(control)->getRawDupValue();
     }
 
-    static JSValue on_finally_callback(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv, int magic, JSValue *data)
-    {
-        auto app = QuickJsEngine::getContextOpaque<jsApp>(ctx);
-        if (app)
-        {
+    static JSValue on_finally_callback(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv, int magic, JSValue *data) {
+        auto app = dynamic_cast<jsApp *>(wxTheApp);
+        if (app) {
             app->showAsyncMask(-1);
         }
         return assistant::js::getUndefined();
@@ -61,49 +54,29 @@ private:
         JSValue promise = JS_NewPromiseCapability(ctx, resolving_funcs);
         auto app = QuickJsEngine::getContextOpaque<jsApp>(ctx);
 
-        if (argc < 1 || !app)
+        auto function = GET_VALUE(0);
+        if (!function->is_function())
         {
-            auto parameter = JS_NewBool(ctx, false);
-            auto return_value = assistant::js::call(ctx, resolving_funcs[0], assistant::js::getUndefined(), parameter);
-            JS_FreeValue(ctx, parameter);
-            JS_FreeValue(ctx, return_value);
+            assistant::js::call(ctx, resolving_funcs[0], assistant::js::getUndefined(), assistant::js::getUndefined());
             return promise;
         }
 
-        JSValue function = argv[0];
-        if (!JS_IsFunction(ctx, function))
+        auto value_promise = assistant::js::call(ctx, function->getRawValue(), assistant::js::getUndefined(), nullptr, 0);
+        if (value_promise->is_promise())
         {
-            auto parameter = JS_NewBool(ctx, false);
-            auto return_value = assistant::js::call(ctx, resolving_funcs[0], assistant::js::getUndefined(), parameter);
-            JS_FreeValue(ctx, parameter);
-            JS_FreeValue(ctx, return_value);
-            return promise;
-        }
-
-        JSValue resolve_func = resolving_funcs[0];
-        JSValue reject_func = resolving_funcs[1];
-
-        auto value_promise = assistant::js::call(ctx, function, assistant::js::getUndefined(), nullptr, 0);
-        if (assistant::js::is_promise(ctx, value_promise))
-        {
-            JSValue finally_fn = JS_GetPropertyStr(ctx, value_promise, "finally");
-
-            if (JS_IsFunction(ctx, finally_fn))
+            auto finally_fn = value_promise->getValue("finally");
+            if (finally_fn->is_function())
             {
                 app->showAsyncMask(1);
                 JSValue finally_cb = JS_NewCFunctionData(ctx, on_finally_callback, 0, 0, 0, nullptr);
-                JSValue finally_ret = assistant::js::call(ctx, finally_fn, value_promise, &finally_cb, 1);
+                auto finally_ret = assistant::js::call(ctx, finally_fn->getRawValue(), value_promise->getRawValue(), &finally_cb, 1);
 
-                JS_FreeValue(ctx, finally_ret);
                 JS_FreeValue(ctx, finally_cb);
             }
-
-            JS_FreeValue(ctx, finally_fn);
         }
 
-        JS_FreeValue(ctx, value_promise);
-        JS_FreeValue(ctx, resolve_func);
-        JS_FreeValue(ctx, reject_func);
+        JS_FreeValue(ctx, resolving_funcs[0]);
+        JS_FreeValue(ctx, resolving_funcs[1]);
 
         return promise;
     }
@@ -242,7 +215,7 @@ public:
 
             auto initScript = assistant::core::getContentResource("ETO_SCRIPT");
             initScript = assistant::js::convert_ts_to_js(this->js->getCtx(), initScript).value_or("");
-//
+
             assistant::js::evalScript(this->js->getCtx(), "globalThis.exports = {};", "<init>");
             assistant::js::evalScript(this->js->getCtx(), initScript, "<init>");
             this->registerPrototypes();

@@ -16,16 +16,14 @@ private:
 
     static void processingPromiseRejection(JSContext* ctx, JSValueConst promise, JSValueConst reason, JS_BOOL is_handled, void* opaque) {
         if (!is_handled) {
-            JSException ex = {};
-            const char* error_msg = JS_ToCString(ctx, reason);
-            if (error_msg) {
-                ex.error = std::string(error_msg);
-                JS_FreeCString(ctx, error_msg);
-            }
+            auto exceptionValue = JsValue::fromValue(ctx, reason);
+            auto message = exceptionValue->getValue("message")->to_string().value_or("");
+            auto stack = exceptionValue->getValue("stack")->to_string().value_or("");
 
-            auto stack = assistant::js::to_string(ctx, reason, "stack");
-            if (!ex.error.empty()) {
-                ex.stack = stack.value_or("");
+            if (!message.empty()) {
+                JSException ex = {};
+                ex.error = message;
+                ex.stack = stack;
                 assistant::js::exceptions->set(ex);
             }
         }
@@ -128,26 +126,6 @@ public:
 
         void *opaque = JS_GetContextOpaque(ctx);
         return reinterpret_cast<T *>(opaque);
-    }
-
-    /** Получить строку */
-    std::optional<std::string> to_string(JSValue value) {
-        return assistant::js::to_string(ctx, value);
-    }
-
-    /** Получить целочисленное значение */
-    std::optional<int> to_int(JSValue value) {
-        return assistant::js::to_int(ctx, value);
-    }
-
-    /** Получить булевное значение */
-    std::optional<bool> to_bool(JSValue value) {
-        return assistant::js::to_bool(ctx, value);
-    }
-
-    /** Получить имя класса */
-    std::string getClassName(JSValue value) {
-        return assistant::js::getClassName(ctx, value);
     }
 
     JSContext* getCtx() {

@@ -106,7 +106,7 @@ namespace assistant
             return str;
         }
 
-        std::vector<std::string> split(std::string text, std::string delim) {
+        std::vector<std::string> split(const std::string& text, const std::string& delim) {
             std::vector<std::string> tokens;
             size_t start = 0;
             size_t end = text.find(delim);

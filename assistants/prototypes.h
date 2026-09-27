@@ -1,3 +1,4 @@
+#pragma once
 #include <wx/wx.h>
 
 namespace prototypes
@@ -6,7 +7,7 @@ namespace prototypes
     {
         template<typename T>
         T *getInstance(JSContext *ctx, JSValue value) {
-            auto address = assistant::js::to_int_64(ctx, value, "__wx_ptr");
+            auto address = assistant::js::getJsValue(ctx, value, "__wx_ptr")->to_int_64();
             if (!address.has_value()) {
                 return nullptr;
             }
@@ -25,11 +26,9 @@ namespace prototypes
 
         JSValue set_value(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
             auto text = prototypes::text::getInstance<wxTextCtrl>(ctx, this_val);
-            if (text && argc > 0) {
-                auto next_text = assistant::js::to_string(ctx, argv[0]);
-                if (next_text.has_value()) {
-                    text->SetValue(wxString::FromUTF8(next_text.value()));
-                }
+            if (text) {
+                auto value = GET_VALUE(0);
+                text->SetValue(wxString::FromUTF8(value->to_string().value_or("")));
             }
             return assistant::js::getUndefined();
         }
@@ -57,8 +56,9 @@ namespace prototypes
         /** Установить значение  */
         JSValue set_value(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
             auto control = prototypes::text::getInstance<wxCheckBox>(ctx, this_val);
-            if (control && argc > 0) {
-                control->SetValue(assistant::js::to_bool(ctx, argv[0]).value_or(false));
+            if (control) {
+                auto value = GET_VALUE(0);
+                control->SetValue(value->to_bool().value_or(false));
             }
             return assistant::js::getUndefined();
         }
@@ -66,8 +66,9 @@ namespace prototypes
         /** Установить подсказку */
         JSValue set_label(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
             auto control = prototypes::text::getInstance<wxCheckBox>(ctx, this_val);
-            if (control && argc > 0) {
-                control->SetLabel(assistant::js::to_string(ctx, argv[0]).value_or(""));
+            if (control) {
+                auto value = GET_VALUE(0);
+                control->SetLabel(value->to_string().value_or(""));
             }
 
             return assistant::js::getUndefined();
@@ -77,33 +78,26 @@ namespace prototypes
     namespace comboBox
     {
         /** Установить элементы в выпадающий список */
-        void set_items(wxComboBox *control, JSContext *ctx, JSValue items) {
-            if (!control) {
-                return;
-            }
-
-            control->Clear();
-            if (!JS_IsArray(ctx, items)) {
-                return;
-            }
-
-            auto length = assistant::js::to_int(ctx, items, "length").value_or(0);
-
-            for (int i = 0; i < length; i++) {
-                JSValue item = JS_GetPropertyUint32(ctx, items, i);
-                auto text = assistant::js::to_string(ctx, item, "text").value_or("");
-                auto value = assistant::js::to_string(ctx, item, "value").value_or("");
-                control->Append(wxString::FromUTF8(text.c_str()), new wxStringClientData(wxString::FromUTF8(value.c_str())));
-                JS_FreeValue(ctx, item);
+        void set_items(wxComboBox *control, JsValue* items) {
+            if (control) {
+                control->Clear();
+                if (items->isArray()) {
+                    auto length = items->getLength();
+                    for (int i = 0; i < length; i++) {
+                        auto item = items->at(i);
+                        auto text = item->getValue("text")->to_string().value_or("");
+                        auto value = item->getValue("value")->to_string().value_or("");
+                        control->Append(wxString::FromUTF8(text.c_str()), new wxStringClientData(wxString::FromUTF8(value.c_str())));
+                    }
+                }
             }
         }
 
         /** Установить элементы в выпадающий список */
         JSValue set_items(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
             auto control = prototypes::text::getInstance<wxComboBox>(ctx, this_val);
-            if (control && argc > 0) {
-                JSValue items = argv[0];
-                prototypes::comboBox::set_items(control, ctx, items);
+            if (control) {
+                prototypes::comboBox::set_items(control, GET_VALUE(0).get());
             }
 
             return assistant::js::getUndefined();
@@ -145,7 +139,7 @@ namespace prototypes
                 return assistant::js::getUndefined();
             }
 
-            auto value = assistant::js::to_string(ctx, argv[0]);
+            auto value = GET_VALUE(0)->to_string();
             if (!value.has_value()) {
                 return assistant::js::getUndefined();
             }

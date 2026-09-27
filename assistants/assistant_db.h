@@ -270,13 +270,13 @@ namespace assistant {
                 return assistant::js::getUndefined();
             }
 
-            auto collection = assistant::js::to_string(ctx, argv[0]);
+            auto collection = GET_VALUE(0)->to_string();
             if (!collection.has_value()) {
                 pprivate::emitError("Не указана коллекция первым параметром");
                 return assistant::js::getUndefined();
             }
 
-            auto json = assistant::js::to_json(ctx, argv[1]);
+            auto json = GET_VALUE(1)->to_json();
             if (!json.has_value()) {
                 pprivate::emitError("Не указан объект выторым параметром");
                 return assistant::js::getUndefined();
@@ -297,13 +297,13 @@ namespace assistant {
                 return assistant::js::getUndefined();
             }
 
-            auto collection = assistant::js::to_string(ctx, argv[0]);
+            auto collection = GET_VALUE(0)->to_string();
             if (!collection.has_value()) {
                 pprivate::emitError("Не указана коллекция первым параметром");
                 return assistant::js::getUndefined();
             }
 
-            auto id = assistant::js::to_int_64(ctx, argv[1]);
+            auto id = GET_VALUE(1)->to_int_64();
             if (!id.has_value()) {
                 pprivate::emitError("Не указан id вторым параметром");
                 return assistant::js::getUndefined();
@@ -315,30 +315,26 @@ namespace assistant {
 
         /** Обновить объект в хранилище */
         JSValue update(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
-            if (argc < 2) {
-                pprivate::emitError("Ожидается 2 параметра");
-                return assistant::js::getUndefined();
-            }
-            auto collection = assistant::js::to_string(ctx, argv[0]);
+            auto collection = GET_VALUE(0)->to_string();
             if (!collection.has_value()) {
                 pprivate::emitError("Не указана коллекция первым параметром");
                 return assistant::js::getUndefined();
             }
 
-            auto value = argv[1];
-            auto id = assistant::js::to_int_64(ctx, value, "id");
+            auto value = GET_VALUE(1);
+            auto id = value->getValue("id")->to_int_64();
             if (!id.has_value()) {
                 pprivate::emitError("В объекте отсутствует поле id");
                 return assistant::js::getUndefined();
             }
 
             JSAtom id_atom = JS_NewAtom(ctx, "id");
-            if (JS_HasProperty(ctx, value, id_atom)) {
-                JS_DeleteProperty(ctx, value, id_atom, 0);
+            if (JS_HasProperty(ctx, value->getRawValue(), id_atom)) {
+                JS_DeleteProperty(ctx, value->getRawValue(), id_atom, 0);
             }
             JS_FreeAtom(ctx, id_atom);
 
-            auto json = assistant::js::to_json(ctx, value);
+            auto json = value->to_json();
             if (!json.has_value()) {
                 pprivate::emitError("Не указан объект выторым параметром");
                 return assistant::js::getUndefined();
@@ -356,21 +352,18 @@ namespace assistant {
             if (argc < 1) {
                 return assistant::js::getUndefined();
             }
-            auto collection = assistant::js::to_string(ctx, argv[0]);
+            auto collection = GET_VALUE(0)->to_string();
             if (!collection.has_value()) {
                 pprivate::emitError("Не указана коллекция первым параметром");
                 return assistant::js::getUndefined();
             }
 
-            std::optional<std::string> query = argc >= 2
-                    ? assistant::js::to_string(ctx, argv[1])
-                    : "";
+            std::optional<std::string> query = GET_VALUE(1)->to_string();
 
             auto results = filter(collection.value(), query.value_or(""));
 
             JSValue js_arr = JS_NewArray(ctx);
-            for (size_t i = 0; i < results.size(); i++)
-            {
+            for (size_t i = 0; i < results.size(); i++) {
                 auto result = results.at(i);
                 auto elem = assistant::js::to_value_from_json(ctx, result.second);
 
@@ -388,13 +381,13 @@ namespace assistant {
                 pprivate::emitError("Ожидается 2 параметра");
                 return assistant::js::getUndefined();
             }
-            auto collection = assistant::js::to_string(ctx, argv[0]);
+            auto collection = GET_VALUE(0)->to_string();
             if (!collection.has_value()) {
                 pprivate::emitError("Не указана коллекция первым параметром");
                 return assistant::js::getUndefined();
             }
 
-            auto id = assistant::js::to_int_64(ctx, argv[1]);
+            auto id = GET_VALUE(1)->to_int_64();
             if (!id.has_value()) {
                 pprivate::emitError("Не указан id вторым параметром");
                 return assistant::js::getUndefined();

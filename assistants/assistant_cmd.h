@@ -94,26 +94,17 @@ namespace assistant
             JS_FreeValue(ctx, resolving_funcs[0]);
             JS_FreeValue(ctx, resolving_funcs[1]);
 
-            std::string command = "";
-            if (argc >= 1) {
-                command = assistant::js::to_string(ctx, argv[0]).value_or("");
-            }
+            std::string command = GET_VALUE(0)->to_string().value_or("");
 
             if (command.empty()) {
-                auto return_value = assistant::js::call(ctx, resolve_func, assistant::js::getUndefined(), nullptr, 0);
-                JS_FreeValue(ctx, return_value);
+                assistant::js::call(ctx, resolve_func, assistant::js::getUndefined(), nullptr, 0);
                 JS_FreeValue(ctx, resolve_func);
                 JS_FreeContext(ctx);
                 return promise;
             }
 
 
-            JSValue receiveOutput = assistant::js::getUndefined();
-            if (argc >= 2) {
-                if (JS_IsFunction(ctx, argv[1])) {
-                    receiveOutput = JS_DupValue(ctx, argv[1]);
-                }
-            }
+            JSValue receiveOutput = GET_VALUE(1)->getRawDupValue();
 
             std::thread worker([runner, resolve_func, ctx, receiveOutput, command]() {
                 runner(command, [ctx, receiveOutput](std::string line){
@@ -172,7 +163,8 @@ namespace assistant
                 if (parameters.size() < 1) {
                     return JsVariant();
                 }
-                auto _repositoryFileName = assistant::js::to_string(ctx, this_instance, "_repositoryFileName");
+
+                auto _repositoryFileName = JsValue::fromValue(ctx, this_instance, true)->getValue("_repositoryFileName")->to_string();
                 if (!_repositoryFileName.has_value()) {
                     return JsVariant();
                 }
